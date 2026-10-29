@@ -3,6 +3,8 @@ require('dotenv').config({ path: require('path').join(__dirname, '.env') });
 const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
+const path = require('node:path');
+const fs = require('node:fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('node:crypto');
@@ -14,7 +16,7 @@ const PORT = Number(process.env.PORT || 5002);
 const MONGO_URI = process.env.MONGO_URI;
 const JWT_SECRET = process.env.JWT_SECRET;
 const allowedOrigins = new Set(
-  (process.env.CLIENT_ORIGIN || '')
+  (process.env.CLIENT_ORIGIN || process.env.RENDER_EXTERNAL_URL || '')
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean)
@@ -731,6 +733,14 @@ app.put('/api/team-tasks/:id', async (req, res) => {
 });
 
 app.use('/api', (req, res) => res.status(404).json({ error: 'API route not found.' }));
+const clientBuildPath = path.resolve(__dirname, '../client/dist');
+if (fs.existsSync(clientBuildPath)) {
+  app.use(express.static(clientBuildPath, { index: false, maxAge: '1h' }));
+  app.get('*path', (req, res, next) => {
+    if (req.method !== 'GET' || req.path.startsWith('/api/') || req.path === '/health') return next();
+    return res.sendFile(path.join(clientBuildPath, 'index.html'));
+  });
+}
 app.use((error, req, res, next) => {
   if (res.headersSent) return next(error);
   const status = Number(error.status || error.statusCode || 500);

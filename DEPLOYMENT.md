@@ -1,32 +1,23 @@
-# Deployment notes
+# Deploy Gyanaegis
 
-The app is split into a Vite client and an Express API. The client is a separate Git repository stored at `client` as a submodule. Deploy that client repository as the static site, or configure your host to fetch submodules recursively. Deploy the API from this repository with `server` as its service root. The services can also sit behind one reverse proxy. Build the client with `VITE_API_URL` set to the public API base URL, including `/api` (for example, `https://api.example.com/api`). For a same-origin reverse proxy, set it to `/api`.
+The repository includes a Dockerfile and a Render Blueprint for a single web service. The service builds the client, serves it from Express, exposes the API under `/api`, and reports database health at `/health`. It uses MongoDB Atlas for persistent data. The free Render plan may sleep while idle; choose a paid plan in Render if you need an always-on service.
 
-## API service
+## Before deployment
 
-Use `server` as the service root, Node.js `22.12` or newer, `npm ci` as the install command, and `npm start` as the start command. Set `NODE_ENV=production`. Configure these variables in the hosting dashboard; do not upload `.env.local` or commit credentials:
+1. Push this repository's `codex/deploy-ready` branch to the GitHub repository connected to Render. The frontend is included in this repository; it is no longer fetched as a Git submodule.
+2. In Render, create a Blueprint from that repository and select this branch. Review the service and plan before confirming creation.
+3. Provide `MONGO_URI` when prompted. Use a dedicated MongoDB Atlas database user with read/write access only to the `gyanaegis` database. Do not use an Atlas administrator account or the testing user. Allow the deployment host to reach Atlas using an appropriately restricted network access rule.
+4. Render generates `JWT_SECRET` and supplies `CLIENT_ORIGIN` from the deployed service URL. Keep these values managed by Render.
+5. Wait for `/health` to report healthy. The app and API will use the same HTTPS address.
 
-- `MONGO_URI`: Atlas connection string for a database user limited to read/write access on the `gyanaegis` database. Do not use an Atlas Admin user for the deployed app.
-- `JWT_SECRET`: a random secret of at least 32 bytes. Use a separate value in the host's secret settings.
-- `CLIENT_ORIGIN`: exact public client origin, such as `https://your-site.example` (no path). Multiple origins may be comma-separated.
-- `PORT`: set by most hosts automatically; otherwise use `5002`.
-- `TRUST_PROXY`: defaults to one proxy hop in production; change it if your host uses a different proxy chain.
-- `RESEND_API_KEY` and `PASSWORD_RESET_FROM` (optional): set both to enable email verification and password reset. The sender address must be verified in Resend, for example `Gyanaegis <noreply@your-domain.example>`. Leave both unset to use recovery codes without email.
+## Password recovery email (optional)
 
-The API exposes `/health`; it returns HTTP 200 only when MongoDB is connected. Allow the API host's outbound IP/network in Atlas. Avoid opening Atlas to all IP addresses.
+Account recovery codes work without email. To enable email verification and password reset, verify a sending domain with Resend, then add `RESEND_API_KEY` and `PASSWORD_RESET_FROM` in the Render service settings. Use a sender address on that verified domain, such as `Gyanaegis <noreply@your-domain.example>`. If either setting is provided, both are required. Redeploy after changing environment settings.
 
-## Client service
+## Local build
 
-Use `client` as the service root, Node.js `22.12` or newer. Run `npm ci && npm run build` and publish the generated `dist` directory. Set `VITE_API_URL` to the deployed API URL before building. The Vite development server proxies `/api` and `/health` to `http://127.0.0.1:5002`; that proxy is for local development only.
+Use Node.js 22.12 or newer. Build the client with `cd client && npm ci && npm run build`; start the API with `cd server && npm ci && npm start`. For local development, Vite proxies API and health requests to port 5002. Keep local settings in the ignored `server/.env.local` file.
 
-## Local development
+## Deploying another way
 
-Start the API with `cd server && npm start`, then start the client with `cd client && npm run dev`. Keep Atlas credentials and `JWT_SECRET` in the ignored `server/.env.local` file.
-
-Before inviting users, use an Atlas database user limited to the app database, review the Atlas network access list, and set the public HTTPS origin and environment variables on the hosting services.
-
-## Password recovery
-
-Every new account receives a one-time recovery code during signup. The user should copy and save it somewhere private; they can replace it later from **Recovery Options** while signed in. Recovery codes are stored hashed, consumed on use, and require no email provider or custom domain. Existing users can sign in and generate one from **Recovery Options**. Before deploying changes, push the client repository first and update the parent repository's submodule revision so the host builds the same client code you verified locally.
-
-Email recovery is optional. Users can add an address from **Recovery Options**; it must be verified before it can receive reset links. To enable email delivery, configure a Resend API key, a sender address on a verified sending domain, and the client HTTPS origin. Reset links expire after 60 minutes and can be used once; email verification links expire after 24 hours.
+Build from the repository root with `docker build -t gyanaegis .` and run the container with `MONGO_URI`, a random `JWT_SECRET` of at least 32 bytes, and `NODE_ENV=production`. Expose the platform-assigned `PORT`. Set `CLIENT_ORIGIN` to the public HTTPS origin if the platform does not provide `RENDER_EXTERNAL_URL`.

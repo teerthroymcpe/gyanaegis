@@ -3,3 +3,5 @@ client/dist/
 server/.env
 server/.env.*
 !server/.env.example
+.env*
+!.env.example
