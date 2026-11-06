@@ -64,6 +64,9 @@ function App() {
   const [goalMinutes, setGoalMinutes] = useState('60');
   const [goalError, setGoalError] = useState('');
   const [goalSaving, setGoalSaving] = useState(false);
+  const [taskComposerOpen, setTaskComposerOpen] = useState(false);
+  const [composerType, setComposerType] = useState('study');
+  const [taskFormError, setTaskFormError] = useState('');
   const [timerNow, setTimerNow] = useState(Date.now());
   const [timerError, setTimerError] = useState('');
   const timerSyncInFlight = useRef(new Set());
@@ -382,6 +385,7 @@ function App() {
       setGoalSubjects('');
       setGoalTargetDate('');
       await Promise.all([fetchStudyGoals(), fetchDailyPlan()]);
+      setTaskComposerOpen(false);
     } catch (err) {
       setGoalError(err.response?.data?.error || 'Could not create your study goal.');
     } finally { setGoalSaving(false); }
@@ -390,6 +394,7 @@ function App() {
   const addTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim() || !currentUser) return;
+    setTaskFormError('');
 
     try {
       const res = await api.post('/tasks', {
@@ -400,8 +405,9 @@ function App() {
       setTasks([...tasks, res.data]);
       setNewTaskTitle('');
       setNewTaskDueDate('');
+      setTaskComposerOpen(false);
     } catch (err) {
-      console.error(err);
+      setTaskFormError(err.response?.data?.error || 'Could not add this task.');
     }
   };
 
@@ -493,7 +499,11 @@ function App() {
 
   const addTeamTask = async (e) => {
     e.preventDefault();
-    if (!newTeamTaskTitle.trim() || !selectedTeamMember) return;
+    if (!newTeamTaskTitle.trim() || !selectedTeamMember) {
+      setTaskFormError('Choose a friend to share this task with.');
+      return;
+    }
+    setTaskFormError('');
 
     try {
       const res = await api.post('/team-tasks', {
@@ -506,8 +516,9 @@ function App() {
       setNewTeamTaskTitle('');
       setNewTeamTaskDueDate('');
       setSelectedTeamMember('');
+      setTaskComposerOpen(false);
     } catch (err) {
-      console.error(err);
+      setTaskFormError(err.response?.data?.error || 'Could not create the shared task.');
     }
   };
 
@@ -603,9 +614,12 @@ function App() {
 
   const acceptedFriends = friendships.filter(f => f.status === 'accepted');
   const pendingRequests = friendships.filter(f => f.status === 'pending' && f.receiverId === currentUser.id);
+  const personalTasks = tasks.filter((task) => !task.goalId);
   const completedStudyTasks = dailyPlan.tasks.filter((task) => task.status === 'Complete').length;
   const studyProgress = dailyPlan.tasks.length ? Math.round((completedStudyTasks / dailyPlan.tasks.length) * 100) : 0;
   const completedTeamTasks = teamTasks.filter((task) => task.status === 'Complete').length;
+  const taskCount = dailyPlan.tasks.length + personalTasks.length + teamTasks.length;
+  const completedTaskCount = completedStudyTasks + personalTasks.filter((task) => task.status === 'Complete').length + completedTeamTasks;
 
   return (
     <div className="app-shell" style={styles.container}>
@@ -675,69 +689,75 @@ function App() {
         </div>
       )}
 
+      {taskComposerOpen && <div className="modalBackdrop task-composer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setTaskComposerOpen(false); }}>
+        <section className="task-composer" role="dialog" aria-modal="true" aria-labelledby="taskComposerTitle">
+          <div className="task-composer-heading"><div><span className="section-kicker">ADD SOMETHING TO YOUR LIST</span><h2 id="taskComposerTitle">Create a task</h2></div><button className="composer-close" type="button" aria-label="Close" onClick={() => setTaskComposerOpen(false)}>×</button></div>
+          <div className="composer-types" role="group" aria-label="Task type">
+            {[['study', '🎯', 'Study goal'], ['personal', '📝', 'Personal'], ['shared', '🤝', 'Shared']].map(([type, icon, label]) => <button className={`composer-type ${composerType === type ? 'type-selected' : ''}`} type="button" aria-pressed={composerType === type} key={type} onClick={() => { setComposerType(type); setTaskFormError(''); setGoalError(''); }}><span>{icon}</span>{label}</button>)}
+          </div>
+          {composerType === 'study' ? <form className="composer-form" onSubmit={createStudyGoal}>
+            <label>What are you preparing for?<input className="colorful-input" type="text" placeholder="e.g. Biology exam" value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required /></label>
+            <div className="composer-form-row"><label>Target date <small>optional</small><input className="colorful-input" type="date" value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} /></label><label>Study time per day<select className="colorful-input" value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}><option value="30">30 minutes</option><option value="60">1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></label></div>
+            <label>Subjects or topics <small>optional · separate with commas</small><input className="colorful-input" type="text" placeholder="Biology, Chemistry…" value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} /></label>
+            {goalError && <p className="form-error" role="alert">{goalError}</p>}
+            <div className="composer-actions"><button className="composer-cancel" type="button" onClick={() => setTaskComposerOpen(false)}>Cancel</button><button className="colorful-button" type="submit" style={styles.button} disabled={goalSaving}>{goalSaving ? 'Saving…' : 'Create study goal'}</button></div>
+          </form> : composerType === 'personal' ? <form className="composer-form" onSubmit={addTask}>
+            <label>Task name<input className="colorful-input" type="text" placeholder="What do you need to do?" value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} maxLength={200} required /></label>
+            <label>Due date <small>optional</small><input className="colorful-input" type="date" value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)} /></label>
+            {taskFormError && <p className="form-error" role="alert">{taskFormError}</p>}
+            <div className="composer-actions"><button className="composer-cancel" type="button" onClick={() => setTaskComposerOpen(false)}>Cancel</button><button className="colorful-button" type="submit" style={styles.button}>Add personal task</button></div>
+          </form> : <form className="composer-form" onSubmit={addTeamTask}>
+            <label>Shared task name<input className="colorful-input" type="text" placeholder="What will you work on together?" value={newTeamTaskTitle} onChange={(e) => setNewTeamTaskTitle(e.target.value)} maxLength={200} required /></label>
+            <label>Study buddy<select className="colorful-input" value={selectedTeamMember} onChange={(e) => setSelectedTeamMember(e.target.value)} required><option value="">Choose a friend…</option>{acceptedFriends.map((friend) => <option key={friend.friendId} value={friend.friendId}>{friend.friendUsername}</option>)}</select></label>
+            <label>Due date <small>optional</small><input className="colorful-input" type="date" value={newTeamTaskDueDate} onChange={(e) => setNewTeamTaskDueDate(e.target.value)} /></label>
+            {!acceptedFriends.length && <p className="composer-hint">Add a friend in Friends & Chat before creating a shared task.</p>}
+            {taskFormError && <p className="form-error" role="alert">{taskFormError}</p>}
+            <div className="composer-actions"><button className="composer-cancel" type="button" onClick={() => setTaskComposerOpen(false)}>Cancel</button><button className="colorful-button" type="submit" style={styles.button} disabled={!acceptedFriends.length}>Share task</button></div>
+          </form>}
+        </section>
+      </div>}
+
       <nav className="app-nav" style={styles.navBar}>
-        <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📊 <span>My Dashboard</span></button>
+        <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📋 <span>Tasks</span></button>
         <button className={`nav-pill ${activeTab === 'friends' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}>💬 <span>Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</span></button>
-        <button className={`nav-pill ${activeTab === 'teams' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'teams' ? styles.activeTab : {}) }} onClick={() => setActiveTab('teams')}>🤝 <span>Team Tasks</span></button>
       </nav>
 
       <main className="main-content" style={styles.main}>
         {activeTab === 'dashboard' && (
           <>
-            <div className="dashboard-hero" style={styles.welcomeCard}>
-              <div className="hero-copy">
-                <span className="hero-eyebrow">YOUR PERSONAL STUDY SPACE</span>
-                <h2>Your next step starts today, {currentUser.username} 🌱</h2>
-                <p>Small, steady sessions add up. Set a goal and we’ll help you keep moving.</p>
-                <span className="hero-note">✨ One focused session at a time</span>
-              </div>
-              <div className="hero-art" aria-hidden="true"><span className="hero-orbit">✦</span><span className="hero-book">📚</span><span className="hero-spark">✧</span></div>
+            <div className="tasks-page-heading">
+              <div><span className="section-kicker">YOUR PERSONAL WORKSPACE</span><h2>Tasks</h2><p>Study, personal, and shared tasks in one place.</p></div>
+              <button className="colorful-button add-task-top" type="button" style={styles.button} onClick={() => { setTaskComposerOpen(true); setTaskFormError(''); setGoalError(''); }}>＋ Add task</button>
             </div>
 
             <div className="dashboard-stats" style={styles.statsGrid}>
               <div className="metric-card metric-points" style={styles.statCard}>
-                <div className="metric-icon">⭐</div><div>
-                <p style={styles.statLabel}>Study points earned</p>
-                <p style={styles.statValue}>{dailyPlan.score}</p></div>
+                <div className="metric-icon">⭐</div><div><p style={styles.statLabel}>Study points</p><p style={styles.statValue}>{dailyPlan.score}</p></div>
               </div>
               <div className="metric-card metric-sessions" style={styles.statCard}>
-                <div className="metric-icon">📖</div><div>
-                <p style={styles.statLabel}>Study sessions completed</p>
-                <p style={styles.statValue}>{dailyPlan.totalCompleted}</p></div>
+                <div className="metric-icon">📋</div><div><p style={styles.statLabel}>All tasks</p><p style={styles.statValue}>{taskCount}</p></div>
               </div>
               <div className="metric-card metric-progress" style={styles.statCard}>
-                <div className="metric-icon">🌈</div><div>
-                <p style={styles.statLabel}>Today’s progress</p>
-                <p style={styles.statValue}>{completedStudyTasks}<span className="metric-total"> / {dailyPlan.tasks.length}</span></p></div>
+                <div className="metric-icon">✅</div><div><p style={styles.statLabel}>Completed tasks</p><p style={styles.statValue}>{completedTaskCount}</p></div>
               </div>
             </div>
 
             <div className="study-panel goals-panel" style={styles.taskSection}>
-              <div className="section-heading"><div><span className="section-kicker">MAKE IT YOURS</span><h3>Your study goals</h3></div><span className="heading-sticker">🎯</span></div>
-              {studyGoals.length > 0 && <div className="goal-chip-list" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+              <div className="section-heading"><div><span className="section-kicker">STUDY GOALS</span><h3>Your focus</h3></div></div>
+              {studyGoals.length > 0 ? <div className="goal-chip-list" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
                 {studyGoals.map((goal) => <span className="goal-chip" key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
                   🎯 {goal.title} · {goal.targetDate ? `📅 ${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : '📅 No deadline set'}
                 </span>)}
-              </div>}
-              <form className="goal-form" onSubmit={createStudyGoal} style={{ ...styles.taskForm, marginTop: '1rem' }}>
-                <input className="colorful-input goal-title-input" type="text" placeholder="What are you preparing for? (e.g. Biology exam)" style={styles.input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required />
-                <input className="colorful-input" type="date" aria-label="Target date (optional)" title="Target date (optional)" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} />
-                <input className="colorful-input goal-subject-input" type="text" placeholder="Subjects or topics, separated by commas (optional)" style={styles.input} value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} />
-                <select className="colorful-input" aria-label="Daily study time" style={styles.actionSelect} value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}>
-                  <option value="30">30 minutes a day</option><option value="60">1 hour a day</option><option value="90">1.5 hours a day</option><option value="120">2 hours a day</option><option value="180">3 hours a day</option>
-                </select>
-                <button className="colorful-button create-goal-button" type="submit" style={styles.button} disabled={goalSaving}>{goalSaving ? 'Saving…' : '+ Create study goal'}</button>
-              </form>
-              {goalError && <p className="form-error" style={{ color: '#fca5a5', marginTop: 0 }}>{goalError}</p>}
+              </div> : <p className="focus-empty">No study goal yet. Choose <strong>Add task → Study goal</strong> to create one.</p>}
             </div>
 
             <div className="study-panel plan-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <div className="section-heading plan-heading"><div><span className="section-kicker">YOUR DAILY RHYTHM</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">☀️ Today</span></div>
+              <div className="section-heading plan-heading"><div><span className="section-kicker">DAILY STUDY TASKS</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">☀️ Today</span></div>
               <div className="daily-progress-wrap"><div className="daily-progress-label"><span>Today’s progress</span><strong>{studyProgress}%</strong></div><div className="daily-progress-track"><div className="daily-progress-fill" style={{ width: `${studyProgress}%` }} /></div></div>
               {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
               <div className="study-session-list" style={styles.taskList}>
                 {dailyPlan.tasks.length === 0 ? (
-                  <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Create a study goal above and we’ll build your first daily plan.'}</p>
+                  <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Add a study goal to get daily tasks here.'}</p>
                 ) : (
                   dailyPlan.tasks.map((task) => (
                     <div className={`study-session-card ${task.status === 'Complete' ? 'session-complete' : task.timerState === 'running' ? 'session-running' : ''}`} key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
@@ -771,14 +791,9 @@ function App() {
             </div>
 
             <div className="study-panel personal-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <div className="section-heading"><div><span className="section-kicker">OTHER THINGS TO DO</span><h3>Personal tasks</h3></div><span className="heading-sticker">📝</span></div>
-              <form className="goal-form personal-task-form" onSubmit={addTask} style={styles.taskForm}>
-                <input type="text" placeholder="Add a one-off task..." style={styles.input} value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} required />
-                <input type="date" aria-label="Task due date" style={styles.input} value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)} />
-                <button type="submit" style={styles.button}>+ Add task</button>
-              </form>
+              <div className="section-heading"><div><span className="section-kicker">YOUR OWN TASKS</span><h3>Personal tasks</h3></div><span className="section-count">{personalTasks.length}</span></div>
               <div style={styles.taskList}>
-                {tasks.filter((task) => !task.goalId).map((task) => (
+                {personalTasks.length === 0 ? <p className="focus-empty">No personal tasks yet. Use <strong>Add task</strong> to make one.</p> : personalTasks.map((task) => (
                   <div key={task.id} style={styles.taskItem}>
                     <div><strong>{task.title}</strong><p style={styles.taskSubtext}>Due: {task.dueDate}</p></div>
                     <select aria-label={`Status for ${task.title}`} style={styles.actionSelect} value={task.status} onChange={(e) => updateTaskStatus(task.id, e.target.value)}>
@@ -787,6 +802,19 @@ function App() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="study-panel team-list-panel" style={{ marginTop: '1rem' }}>
+              <div className="section-heading"><div><span className="section-kicker">WITH YOUR FRIENDS</span><h3>Shared tasks</h3></div><span className="section-count">{teamTasks.length}</span></div>
+              {teamTasks.length === 0 ? <p className="focus-empty">No shared tasks yet. Use <strong>Add task → Shared</strong> to invite a friend.</p> : <div className="shared-task-list">
+                {teamTasks.map((task) => <article className={`shared-task-card task-${task.status.toLowerCase()}`} key={task.id}>
+                  <div className="shared-task-icon">{task.status === 'Complete' ? '🏆' : task.status === 'Dropped' ? '🌱' : '📚'}</div>
+                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>👥 {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> 📅 {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
+                  <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? '✓ Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
+                    <option value="Ongoing">In progress</option><option value="Complete">Complete</option><option value="Dropped">Save for later</option>
+                  </select></div>
+                </article>)}
+              </div>}
             </div>
           </>
         )}
@@ -854,44 +882,6 @@ function App() {
           </div>
         )}
 
-        {activeTab === 'teams' && (
-          <div className="team-page">
-            <div className="team-hero">
-              <div><span className="hero-eyebrow">MAKE PROGRESS TOGETHER</span><h2>Shared goals, shared wins 🤝</h2><p>Pick a small task, invite a friend, and celebrate when you finish it together.</p></div>
-              <div className="team-hero-art" aria-hidden="true"><span>🤜</span><span>🤛</span><i>✨</i></div>
-            </div>
-            <div className="team-summary">
-              <div className="team-summary-card"><span className="summary-icon summary-purple">🗂️</span><div><small>Shared tasks</small><strong>{teamTasks.length}</strong></div></div>
-              <div className="team-summary-card"><span className="summary-icon summary-mint">✅</span><div><small>Finished together</small><strong>{completedTeamTasks}</strong></div></div>
-              <div className="team-summary-card"><span className="summary-icon summary-peach">👥</span><div><small>Study buddies</small><strong>{acceptedFriends.length}</strong></div></div>
-            </div>
-            <section className="study-panel team-create-panel">
-              <div className="section-heading"><div><span className="section-kicker">START A SHARED WIN</span><h3>Create a team task</h3></div><span className="heading-sticker">🚀</span></div>
-              <form className="team-task-form" onSubmit={addTeamTask}>
-                <input type="text" placeholder="What will you work on together?" aria-label="Shared task title" style={styles.input} value={newTeamTaskTitle} onChange={(e) => setNewTeamTaskTitle(e.target.value)} required />
-                <select aria-label="Choose a friend" style={styles.input} value={selectedTeamMember} onChange={(e) => setSelectedTeamMember(e.target.value)} required>
-                  <option value="">Choose a study buddy…</option>
-                  {acceptedFriends.map((friend) => <option key={friend.friendId} value={friend.friendId}>{friend.friendUsername}</option>)}
-                </select>
-                <input type="date" aria-label="Due date (optional)" title="Due date (optional)" style={styles.input} value={newTeamTaskDueDate} onChange={(e) => setNewTeamTaskDueDate(e.target.value)} />
-                <button className="colorful-button" type="submit" style={styles.button} disabled={!acceptedFriends.length}>+ Share task</button>
-              </form>
-              {!acceptedFriends.length && <p className="team-hint">Add and accept a friend request first, then you can share tasks.</p>}
-            </section>
-            <section className="study-panel team-list-panel">
-              <div className="section-heading"><div><span className="section-kicker">KEEP EACH OTHER GOING</span><h3>Your shared tasks</h3></div><span className="team-count-pill">{teamTasks.length} total</span></div>
-              {teamTasks.length === 0 ? <div className="team-empty"><span>🌟</span><h4>Your first shared win is waiting</h4><p>Create a task above and invite a study buddy to join in.</p></div> : <div className="shared-task-list">
-                {teamTasks.map((task) => <article className={`shared-task-card task-${task.status.toLowerCase()}`} key={task.id}>
-                  <div className="shared-task-icon">{task.status === 'Complete' ? '🏆' : task.status === 'Dropped' ? '🌱' : '📚'}</div>
-                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>👥 {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> 📅 {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
-                  <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? '✓ Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
-                    <option value="Ongoing">In progress</option><option value="Complete">Complete</option><option value="Dropped">Save for later</option>
-                  </select></div>
-                </article>)}
-              </div>}
-            </section>
-          </div>
-        )}
       </main>
     </div>
   );
