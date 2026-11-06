@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
@@ -63,6 +63,9 @@ function App() {
   const [goalMinutes, setGoalMinutes] = useState('60');
   const [goalError, setGoalError] = useState('');
   const [goalSaving, setGoalSaving] = useState(false);
+  const [timerNow, setTimerNow] = useState(Date.now());
+  const [timerError, setTimerError] = useState('');
+  const timerSyncInFlight = useRef(new Set());
 
   const [friendships, setFriendships] = useState([]);
   const [friendUsernameInput, setFriendUsernameInput] = useState('');
@@ -137,6 +140,23 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [currentUser, selectedFriend]);
+
+  useEffect(() => {
+    if (!dailyPlan.tasks.some((task) => task.timerState === 'running')) return undefined;
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTimerNow(now);
+      dailyPlan.tasks.forEach((task) => {
+        if (task.timerState !== 'running' || getTaskSecondsLeft(task, now) > 0 || timerSyncInFlight.current.has(task.id)) return;
+        timerSyncInFlight.current.add(task.id);
+        api.put(`/tasks/${task.id}/timer`, { action: 'sync' })
+          .then(() => fetchDailyPlan())
+          .catch((err) => setTimerError(err.response?.data?.error || 'Could not finish the timer.'))
+          .finally(() => timerSyncInFlight.current.delete(task.id));
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [dailyPlan.tasks]);
 
   // Auth Handlers
   const handleAuthSubmit = async (e) => {
@@ -298,6 +318,30 @@ function App() {
       const res = await api.get('/study-plan/today', { params: { date: localDate() } });
       setDailyPlan(res.data);
     } catch (err) { console.error(err); }
+  };
+
+  const getTaskSecondsLeft = (task, now = timerNow) => {
+    const elapsed = (task.timerAccumulatedSeconds || 0) + (task.timerState === 'running' && task.timerStartedAt
+      ? Math.max(0, Math.floor((now - new Date(task.timerStartedAt).getTime()) / 1000))
+      : 0);
+    return Math.max(0, (task.timerDurationSeconds || 0) - elapsed);
+  };
+
+  const formatTimer = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+
+  const updateStudyTimer = async (task, action) => {
+    setTimerError('');
+    try {
+      const res = await api.put(`/tasks/${task.id}/timer`, { action });
+      const updated = res.data;
+      setDailyPlan((plan) => ({
+        ...plan,
+        tasks: plan.tasks.map((item) => item.id === task.id ? { ...item, ...updated } : item)
+      }));
+      if (updated.status === 'Complete' || updated.timerState === 'completed') await fetchDailyPlan();
+    } catch (err) {
+      setTimerError(err.response?.data?.error || 'Could not update the study timer.');
+    }
   };
 
   const createStudyGoal = async (e) => {
@@ -655,7 +699,8 @@ function App() {
 
             <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
               <h3 style={{ marginTop: 0 }}>Today’s study plan</h3>
-              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>Finish a session to earn 10 points. You’re making progress, one step at a time.</p>
+              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>Start a focused timer for each session. Pause whenever you need; 10 points are added automatically when the timer finishes.</p>
+              {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
               <div style={styles.taskList}>
                 {dailyPlan.tasks.length === 0 ? (
                   <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Create a study goal above and we’ll build your first daily plan.'}</p>
@@ -666,8 +711,18 @@ function App() {
                         <span style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
                         <div><strong>{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
-                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points</span> : (
-                        <button type="button" onClick={() => updateTaskStatus(task.id, 'Complete')} style={styles.button}>Mark complete · +{task.points} ⭐</button>
+                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : task.timerState === 'running' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <strong aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums', fontSize: '1.2rem', color: '#7dd3fc' }}>{formatTimer(getTaskSecondsLeft(task))}</strong>
+                          <button type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Pause</button>
+                        </div>
+                      ) : task.timerState === 'paused' ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <strong style={{ fontVariantNumeric: 'tabular-nums', color: '#fbbf24' }}>{formatTimer(getTaskSecondsLeft(task))} paused</strong>
+                          <button type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>Resume</button>
+                        </div>
+                      ) : (
+                        <button type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>Start {Math.ceil((task.timerDurationSeconds || 0) / 60)} min timer</button>
                       )}
                     </div>
                   ))

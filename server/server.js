@@ -90,7 +90,11 @@ taskSchema.add({
   goalId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudyGoal' },
   plannedDate: { type: String },
   points: { type: Number, default: 0 },
-  completedAt: { type: Date }
+  completedAt: { type: Date },
+  timerDurationSeconds: { type: Number, default: 0 },
+  timerAccumulatedSeconds: { type: Number, default: 0 },
+  timerStartedAt: { type: Date },
+  timerState: { type: String, enum: ['ready', 'running', 'paused', 'completed'], default: 'ready' }
 });
 taskSchema.index({ userId: 1, goalId: 1, plannedDate: 1, title: 1 }, {
   unique: true,
@@ -610,21 +614,98 @@ app.get('/api/study-plan/today', async (req, res) => {
         plannedDate: date,
         title: `${title} (${minutes} min)`,
         dueDate: date,
-        points: 10
+        points: 10,
+        timerDurationSeconds: minutes * 60
       })), { ordered: false }).catch((error) => { if (error.code !== 11000 && !error.writeErrors?.every((entry) => entry.code === 11000)) throw error; });
     }
-    const [tasks, score] = await Promise.all([
-      Task.find({ userId: req.userId, plannedDate: date }).sort({ createdAt: 1 }),
-      Task.aggregate([{ $match: { userId: req.userId, goalId: { $exists: true }, status: 'Complete' } }, { $group: { _id: null, points: { $sum: '$points' }, completed: { $sum: 1 } } }])
+    const tasks = await Task.find({ userId: req.userId, plannedDate: date }).sort({ createdAt: 1 });
+    for (const task of tasks) {
+      if (!task.timerDurationSeconds) {
+        const minutes = Number(task.title.match(/\((\d+) min\)$/)?.[1]) || 30;
+        task.timerDurationSeconds = minutes * 60;
+      }
+      if (!task.timerState) task.timerState = 'ready';
+      if (!Number.isFinite(task.timerAccumulatedSeconds)) task.timerAccumulatedSeconds = 0;
+      if (task.timerState === 'running' && task.timerStartedAt) {
+        const elapsed = task.timerAccumulatedSeconds + Math.floor((Date.now() - task.timerStartedAt.getTime()) / 1000);
+        if (elapsed >= task.timerDurationSeconds) {
+          task.timerAccumulatedSeconds = task.timerDurationSeconds;
+          task.timerStartedAt = undefined;
+          task.timerState = 'completed';
+          task.status = 'Complete';
+          task.completedAt = new Date();
+        }
+      }
+      if (task.isModified()) await task.save();
+    }
+    const score = await Task.aggregate([
+      { $match: { userId: req.userId, goalId: { $exists: true }, status: 'Complete' } },
+      { $group: { _id: null, points: { $sum: '$points' }, completed: { $sum: 1 } } }
     ]);
     return res.json({
-      tasks: tasks.map((task) => ({ id: task._id.toString(), title: task.title, status: task.status, points: task.points || 10, goalId: task.goalId?.toString() })),
+      tasks: tasks.map((task) => ({
+        id: task._id.toString(), title: task.title, status: task.status, points: task.points || 10, goalId: task.goalId?.toString(),
+        timerState: task.timerState || 'ready', timerDurationSeconds: task.timerDurationSeconds,
+        timerAccumulatedSeconds: task.timerAccumulatedSeconds || 0, timerStartedAt: task.timerStartedAt
+      })),
       score: score[0]?.points || 0,
       totalCompleted: score[0]?.completed || 0
     });
   } catch (error) {
     reportFailure('Load daily study plan failed', error);
     return res.status(500).json({ error: 'Could not prepare today’s study plan.' });
+  }
+});
+
+app.put('/api/tasks/:id/timer', async (req, res) => {
+  try {
+    const action = req.body?.action;
+    if (!['start', 'pause', 'resume', 'sync'].includes(action)) return res.status(400).json({ error: 'Choose start, pause, resume, or sync.' });
+    const task = await Task.findOne({ _id: req.params.id, userId: req.userId, goalId: { $exists: true } });
+    if (!task) return res.status(404).json({ error: 'Study session not found.' });
+    if (!task.timerDurationSeconds) task.timerDurationSeconds = (Number(task.title.match(/\((\d+) min\)$/)?.[1]) || 30) * 60;
+    if (!task.timerState) task.timerState = 'ready';
+    if (task.status === 'Complete' || task.timerState === 'completed') {
+      task.timerState = 'completed';
+      return res.json({ id: task._id.toString(), status: 'Complete', points: task.points || 10, timerState: 'completed', timerDurationSeconds: task.timerDurationSeconds, timerAccumulatedSeconds: task.timerDurationSeconds });
+    }
+    const now = new Date();
+    if (action === 'start' && task.timerState === 'ready') {
+      task.timerState = 'running';
+      task.timerStartedAt = now;
+    } else if (action === 'resume' && task.timerState === 'paused') {
+      task.timerState = 'running';
+      task.timerStartedAt = now;
+    } else if (action === 'pause' && task.timerState === 'running' && task.timerStartedAt) {
+      task.timerAccumulatedSeconds += Math.max(0, Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000));
+      task.timerStartedAt = undefined;
+      if (task.timerAccumulatedSeconds >= task.timerDurationSeconds) {
+        task.timerAccumulatedSeconds = task.timerDurationSeconds;
+        task.timerState = 'completed';
+        task.status = 'Complete';
+        task.completedAt = now;
+      } else task.timerState = 'paused';
+    } else if (action === 'sync' && task.timerState === 'running' && task.timerStartedAt) {
+      const elapsed = task.timerAccumulatedSeconds + Math.max(0, Math.floor((now.getTime() - task.timerStartedAt.getTime()) / 1000));
+      if (elapsed >= task.timerDurationSeconds) {
+        task.timerAccumulatedSeconds = task.timerDurationSeconds;
+        task.timerStartedAt = undefined;
+        task.timerState = 'completed';
+        task.status = 'Complete';
+        task.completedAt = now;
+      }
+    } else if (action !== 'sync') {
+      return res.status(409).json({ error: 'That timer action is not available right now.' });
+    }
+    await task.save();
+    return res.json({
+      id: task._id.toString(), status: task.status, points: task.points || 10, timerState: task.timerState,
+      timerDurationSeconds: task.timerDurationSeconds, timerAccumulatedSeconds: task.timerAccumulatedSeconds || 0,
+      timerStartedAt: task.timerStartedAt
+    });
+  } catch (error) {
+    reportFailure('Study timer update failed', error);
+    return res.status(500).json({ error: 'Could not update this study timer.' });
   }
 });
 
@@ -645,7 +726,7 @@ app.put('/api/tasks/:id', async (req, res) => {
     const status = req.body?.status;
     if (!['Ongoing', 'Complete', 'Dropped'].includes(status)) return res.status(400).json({ error: 'Invalid task status.' });
     const update = { status, completedAt: status === 'Complete' ? new Date() : null };
-    const updated = await Task.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, update, { returnDocument: 'after', runValidators: true });
+    const updated = await Task.findOneAndUpdate({ _id: req.params.id, userId: req.userId, goalId: { $exists: false } }, update, { returnDocument: 'after', runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Task not found.' });
     return res.json({ id: updated._id.toString(), title: updated.title, status: updated.status, dueDate: updated.dueDate, points: updated.points || 0, completedAt: updated.completedAt });
   } catch (error) {
