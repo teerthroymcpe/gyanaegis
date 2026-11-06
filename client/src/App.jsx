@@ -76,6 +76,7 @@ function App() {
 
   const [messages, setMessages] = useState([]);
   const [newMessageText, setNewMessageText] = useState('');
+  const chatThreadRef = useRef(null);
 
   const [teamTasks, setTeamTasks] = useState([]);
   const [newTeamTaskTitle, setNewTeamTaskTitle] = useState('');
@@ -141,6 +142,11 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [currentUser, selectedFriend]);
+
+  const newestMessageId = messages.length ? (messages[messages.length - 1]._id || messages[messages.length - 1].id) : '';
+  useEffect(() => {
+    if (chatThreadRef.current) chatThreadRef.current.scrollTo({ top: chatThreadRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages.length, newestMessageId, selectedFriend?.friendId]);
 
   useEffect(() => {
     if (!dailyPlan.tasks.some((task) => task.timerState === 'running')) return undefined;
@@ -599,6 +605,7 @@ function App() {
   const pendingRequests = friendships.filter(f => f.status === 'pending' && f.receiverId === currentUser.id);
   const completedStudyTasks = dailyPlan.tasks.filter((task) => task.status === 'Complete').length;
   const studyProgress = dailyPlan.tasks.length ? Math.round((completedStudyTasks / dailyPlan.tasks.length) * 100) : 0;
+  const completedTeamTasks = teamTasks.filter((task) => task.status === 'Complete').length;
 
   return (
     <div className="app-shell" style={styles.container}>
@@ -785,119 +792,104 @@ function App() {
         )}
 
         {activeTab === 'friends' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '1.5rem', alignItems: 'start' }}>
-            <div style={styles.taskSection}>
-              <h3>Add Friend</h3>
-              <form onSubmit={sendFriendRequest} style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-                <input type="text" placeholder="Friend's Username..." style={styles.input} value={friendUsernameInput} onChange={(e) => setFriendUsernameInput(e.target.value)} required />
-                <button type="submit" style={styles.button}>Add</button>
-              </form>
-              {friendError && <p style={{ color: '#fca5a5', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{friendError}</p>}
-              {friendSuccess && <p style={{ color: '#34d399', fontSize: '0.85rem', marginBottom: '0.5rem' }}>{friendSuccess}</p>}
-
-              {pendingRequests.length > 0 && (
-                <div style={{ marginBottom: '1.5rem', marginTop: '1rem' }}>
-                  <h4>Pending Incoming Requests</h4>
-                  {pendingRequests.map(req => (
-                    <div key={req.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '0.5rem', background: '#334155', padding: '0.5rem 0.75rem', borderRadius: '6px' }}>
-                      <span style={{ fontSize: '0.85rem' }}>From: <strong>{req.senderUsername}</strong></span>
-                      <button onClick={() => acceptFriendRequest(req.id)} style={{ ...styles.button, padding: '0.3rem 0.6rem', fontSize: '0.8rem' }}>Accept</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <h4 style={{ marginTop: '1.5rem' }}>My Friends</h4>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                {acceptedFriends.length === 0 ? (
-                  <p style={{ color: '#94a3b8', fontSize: '0.9rem' }}>No friends added yet.</p>
-                ) : (
-                  acceptedFriends.map(f => (
-                    <div
-                      key={f.id}
-                      onClick={() => {
-                        setSelectedFriend(f);
-                        fetchMessages(f.friendId);
-                      }}
-                      style={{ padding: '0.75rem', borderRadius: '8px', cursor: 'pointer', backgroundColor: selectedFriend?.friendId === f.friendId ? '#2563eb' : '#334155' }}
-                    >
-                      👤 <strong>{f.friendUsername}</strong>
-                    </div>
-                  ))
-                )}
-              </div>
+          <div className="social-page">
+            <div className="social-hero">
+              <div><span className="hero-eyebrow">YOUR PEOPLE, YOUR PROGRESS</span><h2>Study feels better together 💬</h2><p>Catch up with friends, share a little encouragement, and keep each other moving.</p></div>
+              <div className="social-hero-art" aria-hidden="true">💌</div>
             </div>
+            <div className="social-layout">
+              <aside className="friend-sidebar study-panel">
+                <div className="section-heading"><div><span className="section-kicker">YOUR CIRCLE</span><h3>Friends <span className="count-bubble">{acceptedFriends.length}</span></h3></div><span className="heading-sticker">🫶</span></div>
+                <form className="friend-add-form" onSubmit={sendFriendRequest}>
+                  <label htmlFor="friend-username">Add a study buddy</label>
+                  <div className="friend-add-row"><input id="friend-username" type="text" placeholder="Friend’s username" style={styles.input} value={friendUsernameInput} onChange={(e) => setFriendUsernameInput(e.target.value)} required /><button className="colorful-button" type="submit" style={styles.button} aria-label="Send friend request">+</button></div>
+                </form>
+                {friendError && <p className="social-alert social-alert-error" role="alert">{friendError}</p>}
+                {friendSuccess && <p className="social-alert social-alert-success" role="status">{friendSuccess}</p>}
 
-            <div style={{ ...styles.taskSection, display: 'flex', flexDirection: 'column', height: '520px' }}>
-              {selectedFriend ? (
-                <>
-                  <h3 style={{ borderBottom: '1px solid #334155', paddingBottom: '0.75rem', marginBottom: '1rem' }}>Chat with <strong>{selectedFriend.friendUsername}</strong></h3>
-                  <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '0.75rem', paddingRight: '0.5rem' }}>
-                    {messages.length === 0 ? (
-                      <p style={{ color: '#94a3b8', textAlign: 'center', margin: 'auto' }}>No messages yet. Say hello!</p>
-                    ) : (
-                      messages.map(msg => (
-                        <div key={msg._id || msg.id} style={{ alignSelf: msg.senderId === currentUser.id ? 'flex-end' : 'flex-start', backgroundColor: msg.senderId === currentUser.id ? '#2563eb' : '#334155', padding: '0.6rem 1rem', borderRadius: '10px', maxWidth: '75%' }}>
-                          <p style={{ margin: 0, fontSize: '0.95rem' }}>{msg.text}</p>
-                          <span style={{ fontSize: '0.7rem', color: '#94a3b8', display: 'block', textAlign: 'right', marginTop: '0.2rem' }}>{msg.timestamp}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <form onSubmit={sendMessage} style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                    <input type="text" placeholder="Type a message..." style={styles.input} value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} required />
-                    <button type="submit" style={styles.button}>Send</button>
-                  </form>
-                </>
-              ) : (
-                <div style={{ margin: 'auto', textAlign: 'center', color: '#94a3b8' }}>
-                  <h3>Select a friend from the left sidebar to start chatting</h3>
+                {pendingRequests.length > 0 && <div className="request-section">
+                  <span className="sidebar-label">NEW REQUESTS <span>{pendingRequests.length}</span></span>
+                  {pendingRequests.map((req) => <div className="request-card" key={req.id}><span className="friend-avatar avatar-coral">{req.senderUsername.slice(0, 1).toUpperCase()}</span><div className="request-copy"><strong>{req.senderUsername}</strong><small>wants to connect</small></div><button type="button" className="accept-button" onClick={() => acceptFriendRequest(req.id)}>Accept</button></div>)}
+                </div>}
+
+                <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? '✦ Ready to chat' : ''}</span></div>
+                <div className="friend-list">
+                  {acceptedFriends.length === 0 ? <div className="sidebar-empty"><span>🌱</span><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <button
+                    className={`friend-row ${selectedFriend?.friendId === friend.friendId ? 'friend-selected' : ''}`}
+                    key={friend.id}
+                    type="button"
+                    onClick={() => { setSelectedFriend(friend); fetchMessages(friend.friendId); }}
+                  >
+                    <span className={`friend-avatar avatar-${index % 4}`}>{friend.friendUsername.slice(0, 1).toUpperCase()}</span>
+                    <span className="friend-row-copy"><strong>{friend.friendUsername}</strong><small>{selectedFriend?.friendId === friend.friendId ? 'Chat is open' : 'Study buddy'}</small></span>
+                    <span className="friend-row-arrow">›</span>
+                  </button>)}
                 </div>
-              )}
+              </aside>
+
+              <section className="chat-panel study-panel" aria-label="Friend chat">
+                {selectedFriend ? <>
+                  <div className="chat-header">
+                    <span className="friend-avatar avatar-chat">{selectedFriend.friendUsername.slice(0, 1).toUpperCase()}</span>
+                    <div className="chat-header-copy"><span className="section-kicker">YOUR STUDY BUDDY</span><h3>{selectedFriend.friendUsername}</h3></div>
+                    <span className="chat-connected">✦ Connected</span>
+                  </div>
+                  <div className="chat-thread" aria-live="polite" ref={chatThreadRef}>
+                    {messages.length === 0 ? <div className="chat-empty"><span>👋</span><h4>Say hello to {selectedFriend.friendUsername}</h4><p>A little encouragement can make someone’s day.</p></div> : messages.map((message) => {
+                      const mine = message.senderId === currentUser.id;
+                      const time = new Date(message.timestamp);
+                      return <div className={`message-row ${mine ? 'message-row-mine' : ''}`} key={message._id || message.id}>
+                        {!mine && <span className="message-avatar">{selectedFriend.friendUsername.slice(0, 1).toUpperCase()}</span>}
+                        <div className={`message-bubble ${mine ? 'message-mine' : 'message-theirs'}`}><p>{message.text}</p><span>{Number.isNaN(time.getTime()) ? '' : time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                      </div>;
+                    })}
+                  </div>
+                  <form className="chat-compose" onSubmit={sendMessage}>
+                    <input type="text" aria-label="Message" placeholder={`Write a kind note to ${selectedFriend.friendUsername}…`} style={styles.input} value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} required />
+                    <button className="chat-send-button" type="submit" aria-label="Send message">Send <span>➤</span></button>
+                  </form>
+                </> : <div className="chat-placeholder"><div className="chat-placeholder-art">💬</div><span className="section-kicker">A LITTLE CONNECTION GOES A LONG WAY</span><h3>Choose a friend to start chatting</h3><p>Your conversations with study buddies will show up here.</p></div>}
+              </section>
             </div>
           </div>
         )}
 
         {activeTab === 'teams' && (
-          <div style={styles.taskSection}>
-            <h3>Create Shared Team Task</h3>
-            <form onSubmit={addTeamTask} style={styles.taskForm}>
-              <input type="text" placeholder="Team Task Title..." style={styles.input} value={newTeamTaskTitle} onChange={(e) => setNewTeamTaskTitle(e.target.value)} required />
-              <select style={styles.input} value={selectedTeamMember} onChange={(e) => setSelectedTeamMember(e.target.value)} required>
-                <option value="">Select Friend Partner...</option>
-                {acceptedFriends.map(f => (
-                  <option key={f.friendId} value={f.friendId}>{f.friendUsername}</option>
-                ))}
-              </select>
-              <input type="date" style={styles.input} value={newTeamTaskDueDate} onChange={(e) => setNewTeamTaskDueDate(e.target.value)} />
-              <button type="submit" style={styles.button}>+ Create Team Task</button>
-            </form>
-
-            <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Shared Team Tasks</h3>
-            <div style={styles.taskList}>
-              {teamTasks.length === 0 ? (
-                <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>No team tasks found.</p>
-              ) : (
-                teamTasks.map((task) => (
-                  <div key={task.id} style={styles.taskItem}>
-                    <div>
-                      <strong>{task.title}</strong>
-                      <p style={styles.taskSubtext}>Members: {task.memberNames ? task.memberNames.join(', ') : 'Team'} | Due: {task.dueDate}</p>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      <span style={{ ...styles.statusBadge, backgroundColor: task.status === 'Complete' ? '#059669' : task.status === 'Dropped' ? '#DC2626' : '#D97706' }}>
-                        {task.status}
-                      </span>
-                      <select style={styles.actionSelect} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
-                        <option value="Ongoing">Ongoing</option>
-                        <option value="Complete">Complete</option>
-                        <option value="Dropped">Dropped</option>
-                      </select>
-                    </div>
-                  </div>
-                ))
-              )}
+          <div className="team-page">
+            <div className="team-hero">
+              <div><span className="hero-eyebrow">MAKE PROGRESS TOGETHER</span><h2>Shared goals, shared wins 🤝</h2><p>Pick a small task, invite a friend, and celebrate when you finish it together.</p></div>
+              <div className="team-hero-art" aria-hidden="true"><span>🤜</span><span>🤛</span><i>✨</i></div>
             </div>
+            <div className="team-summary">
+              <div className="team-summary-card"><span className="summary-icon summary-purple">🗂️</span><div><small>Shared tasks</small><strong>{teamTasks.length}</strong></div></div>
+              <div className="team-summary-card"><span className="summary-icon summary-mint">✅</span><div><small>Finished together</small><strong>{completedTeamTasks}</strong></div></div>
+              <div className="team-summary-card"><span className="summary-icon summary-peach">👥</span><div><small>Study buddies</small><strong>{acceptedFriends.length}</strong></div></div>
+            </div>
+            <section className="study-panel team-create-panel">
+              <div className="section-heading"><div><span className="section-kicker">START A SHARED WIN</span><h3>Create a team task</h3></div><span className="heading-sticker">🚀</span></div>
+              <form className="team-task-form" onSubmit={addTeamTask}>
+                <input type="text" placeholder="What will you work on together?" aria-label="Shared task title" style={styles.input} value={newTeamTaskTitle} onChange={(e) => setNewTeamTaskTitle(e.target.value)} required />
+                <select aria-label="Choose a friend" style={styles.input} value={selectedTeamMember} onChange={(e) => setSelectedTeamMember(e.target.value)} required>
+                  <option value="">Choose a study buddy…</option>
+                  {acceptedFriends.map((friend) => <option key={friend.friendId} value={friend.friendId}>{friend.friendUsername}</option>)}
+                </select>
+                <input type="date" aria-label="Due date (optional)" title="Due date (optional)" style={styles.input} value={newTeamTaskDueDate} onChange={(e) => setNewTeamTaskDueDate(e.target.value)} />
+                <button className="colorful-button" type="submit" style={styles.button} disabled={!acceptedFriends.length}>+ Share task</button>
+              </form>
+              {!acceptedFriends.length && <p className="team-hint">Add and accept a friend request first, then you can share tasks.</p>}
+            </section>
+            <section className="study-panel team-list-panel">
+              <div className="section-heading"><div><span className="section-kicker">KEEP EACH OTHER GOING</span><h3>Your shared tasks</h3></div><span className="team-count-pill">{teamTasks.length} total</span></div>
+              {teamTasks.length === 0 ? <div className="team-empty"><span>🌟</span><h4>Your first shared win is waiting</h4><p>Create a task above and invite a study buddy to join in.</p></div> : <div className="shared-task-list">
+                {teamTasks.map((task) => <article className={`shared-task-card task-${task.status.toLowerCase()}`} key={task.id}>
+                  <div className="shared-task-icon">{task.status === 'Complete' ? '🏆' : task.status === 'Dropped' ? '🌱' : '📚'}</div>
+                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>👥 {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> 📅 {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
+                  <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? '✓ Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
+                    <option value="Ongoing">In progress</option><option value="Complete">Complete</option><option value="Dropped">Save for later</option>
+                  </select></div>
+                </article>)}
+              </div>}
+            </section>
           </div>
         )}
       </main>
