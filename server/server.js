@@ -62,7 +62,7 @@ app.use(cors({
     return callback(error);
   }
 }));
-app.use(express.json({ limit: '256kb' }));
+app.use(express.json({ limit: '512kb' }));
 
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
@@ -135,7 +135,9 @@ const postSchema = new mongoose.Schema({
   authorId: { type: String, required: true, index: true },
   authorName: { type: String, required: true, maxlength: 50 },
   authorUsername: { type: String, maxlength: 32, default: '' },
-  text: { type: String, required: true, trim: true, maxlength: 1000 }
+  text: { type: String, trim: true, maxlength: 1000, default: '' },
+  imageData: { type: String, default: '' },
+  editedAt: { type: Date, default: null }
 }, { timestamps: true });
 const Post = mongoose.model('Post', postSchema);
 
@@ -497,6 +499,10 @@ app.post('/api/auth/password-reset/recovery-code', limitAuthAttempts, async (req
 
 app.use('/api', authenticate);
 
+function validPostImage(imageData) {
+  return !imageData || (typeof imageData === 'string' && imageData.length <= 340000 && /^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(imageData));
+}
+
 app.get('/api/posts', async (req, res) => {
   try {
     const posts = await Post.find().sort({ _id: -1 }).limit(100).lean();
@@ -508,7 +514,7 @@ app.get('/api/posts', async (req, res) => {
       return {
         id: post._id.toString(), author: author?.displayName || author?.displayUsername || post.authorName,
         authorUsername: author?.username || post.authorUsername || post.authorName.toLowerCase(),
-        avatarData: author?.avatarData || '', text: post.text, createdAt: post.createdAt
+        avatarData: author?.avatarData || '', text: post.text, imageData: post.imageData || '', editedAt: post.editedAt || null, createdAt: post.createdAt
       };
     }));
   } catch (error) {
@@ -520,14 +526,44 @@ app.get('/api/posts', async (req, res) => {
 app.post('/api/posts', async (req, res) => {
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
-    if (!text || text.length > 1000) return res.status(400).json({ error: 'Write a post between 1 and 1000 characters.' });
+    const imageData = typeof req.body?.imageData === 'string' ? req.body.imageData : '';
+    if ((!text && !imageData) || text.length > 1000) return res.status(400).json({ error: 'Add text or a photo to your post (up to 1000 characters).' });
+    if (!validPostImage(imageData)) return res.status(400).json({ error: 'Choose a smaller photo and try again.' });
     const author = await User.findById(req.userId).select('username displayUsername displayName avatarData');
     if (!author) return res.status(404).json({ error: 'Account not found.' });
-    const post = await Post.create({ authorId: req.userId, authorName: author.displayName || author.displayUsername, authorUsername: author.username, text });
-    return res.status(201).json({ id: post._id.toString(), author: post.authorName, authorUsername: author.username, avatarData: author.avatarData || '', text: post.text, createdAt: post.createdAt });
+    const post = await Post.create({ authorId: req.userId, authorName: author.displayName || author.displayUsername, authorUsername: author.username, text, imageData });
+    return res.status(201).json({ id: post._id.toString(), author: post.authorName, authorUsername: author.username, avatarData: author.avatarData || '', text: post.text, imageData: post.imageData, editedAt: post.editedAt, createdAt: post.createdAt });
   } catch (error) {
     reportFailure('Create community post failed', error);
     return res.status(500).json({ error: 'Could not publish your post.' });
+  }
+});
+
+app.patch('/api/posts/:id', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Post not found.' });
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    const imageData = typeof req.body?.imageData === 'string' ? req.body.imageData : '';
+    if ((!text && !imageData) || text.length > 1000) return res.status(400).json({ error: 'Add text or a photo to your post (up to 1000 characters).' });
+    if (!validPostImage(imageData)) return res.status(400).json({ error: 'Choose a smaller photo and try again.' });
+    const post = await Post.findOneAndUpdate({ _id: req.params.id, authorId: req.userId }, { text, imageData, editedAt: new Date() }, { returnDocument: 'after', runValidators: true });
+    if (!post) return res.status(404).json({ error: 'Post not found or you cannot edit it.' });
+    return res.json({ id: post._id.toString(), author: post.authorName, authorUsername: post.authorUsername, text: post.text, imageData: post.imageData || '', editedAt: post.editedAt, createdAt: post.createdAt });
+  } catch (error) {
+    reportFailure('Edit community post failed', error);
+    return res.status(500).json({ error: 'Could not save your post.' });
+  }
+});
+
+app.delete('/api/posts/:id', async (req, res) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(404).json({ error: 'Post not found.' });
+    const post = await Post.findOneAndDelete({ _id: req.params.id, authorId: req.userId });
+    if (!post) return res.status(404).json({ error: 'Post not found or you cannot delete it.' });
+    return res.json({ id: post._id.toString() });
+  } catch (error) {
+    reportFailure('Delete community post failed', error);
+    return res.status(500).json({ error: 'Could not delete your post.' });
   }
 });
 
@@ -543,7 +579,7 @@ app.get('/api/profiles/:username', async (req, res) => {
     return res.json({
       username: user.username, displayUsername: user.displayUsername, displayName: user.displayName || user.displayUsername,
       bio: user.bio || '', avatarData: user.avatarData || '', createdAt: user.createdAt, postCount,
-      posts: posts.map((post) => ({ id: post._id.toString(), text: post.text, createdAt: post.createdAt }))
+      posts: posts.map((post) => ({ id: post._id.toString(), text: post.text, imageData: post.imageData || '', editedAt: post.editedAt || null, createdAt: post.createdAt }))
     });
   } catch (error) {
     reportFailure('Load profile failed', error);
@@ -885,12 +921,13 @@ app.get('/api/friends/:userId', async (req, res) => {
 app.post('/api/friends/accept', async (req, res) => {
   try {
     const requestId = req.body?.requestId;
-    const request = await Friendship.findOneAndUpdate(
-      { _id: requestId, receiverId: req.userId, status: 'pending' },
-      { status: 'accepted' },
-      { returnDocument: 'after', runValidators: true }
-    );
+    if (typeof requestId !== 'string' || !mongoose.isValidObjectId(requestId)) return res.status(400).json({ error: 'This friend request is no longer valid. Refresh and try again.' });
+    const request = await Friendship.findOne({ _id: requestId, receiverId: req.userId });
     if (!request) return res.status(404).json({ error: 'Friend request not found.' });
+    if (request.status === 'accepted') return res.json({ id: request._id.toString(), status: 'accepted' });
+    if (request.status !== 'pending') return res.status(409).json({ error: 'This friend request is no longer pending.' });
+    request.status = 'accepted';
+    await request.save();
     return res.json(request);
   } catch (error) {
     reportFailure('Accept friend request failed', error);

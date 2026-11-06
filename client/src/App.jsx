@@ -25,6 +25,33 @@ function ProfileAvatar({ name, image, className = '', onClick }) {
   </Tag>;
 }
 
+function compressPostPhoto(file) {
+  if (!file?.type.startsWith('image/')) return Promise.reject(new Error('Choose an image file.'));
+  if (file.size > 15 * 1024 * 1024) return Promise.reject(new Error('Choose a photo smaller than 15 MB.'));
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not open that image.')); };
+    image.onload = () => {
+      let scale = Math.min(1, 900 / Math.max(image.width, image.height));
+      let data = '';
+      for (let attempt = 0; attempt < 7; attempt += 1) {
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+        data = canvas.toDataURL('image/jpeg', Math.max(.48, .82 - attempt * .06));
+        if (data.length <= 340000) break;
+        scale *= .82;
+      }
+      URL.revokeObjectURL(url);
+      if (data.length > 340000) reject(new Error('That photo is too large. Choose another photo.'));
+      else resolve(data);
+    };
+    image.src = url;
+  });
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     if (!localStorage.getItem('gy_cloud_token')) return null;
@@ -82,6 +109,7 @@ function App() {
   const [friendUsernameInput, setFriendUsernameInput] = useState('');
   const [friendError, setFriendError] = useState('');
   const [friendSuccess, setFriendSuccess] = useState('');
+  const [acceptingRequestId, setAcceptingRequestId] = useState('');
   const [selectedFriend, setSelectedFriend] = useState(null);
 
   const [messages, setMessages] = useState([]);
@@ -89,10 +117,15 @@ function App() {
   const chatThreadRef = useRef(null);
   const [posts, setPosts] = useState([]);
   const [postText, setPostText] = useState('');
+  const [postImage, setPostImage] = useState('');
   const [postError, setPostError] = useState('');
   const [postsLoadError, setPostsLoadError] = useState('');
   const [postsLoading, setPostsLoading] = useState(false);
   const [postSubmitting, setPostSubmitting] = useState(false);
+  const [editingPostId, setEditingPostId] = useState('');
+  const [editingPostText, setEditingPostText] = useState('');
+  const [editingPostImage, setEditingPostImage] = useState('');
+  const [postSavingId, setPostSavingId] = useState('');
   const [profileData, setProfileData] = useState(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -357,16 +390,56 @@ function App() {
   const publishPost = async (e) => {
     e.preventDefault();
     const text = postText.trim();
-    if (!text || postSubmitting) return;
+    if ((!text && !postImage) || postSubmitting) return;
     setPostError('');
     setPostSubmitting(true);
     try {
-      const res = await api.post('/posts', { text });
+      const res = await api.post('/posts', { text, imageData: postImage });
       setPosts((items) => [res.data, ...items].slice(0, 100));
       setPostText('');
+      setPostImage('');
     } catch (err) {
       setPostError(err.response?.data?.error || 'Could not publish your post.');
     } finally { setPostSubmitting(false); }
+  };
+
+  const choosePostPhoto = async (file, setImage) => {
+    if (!file) return;
+    setPostError('');
+    try { setImage(await compressPostPhoto(file)); }
+    catch (err) { setPostError(err.message || 'Could not add that photo.'); }
+  };
+
+  const beginPostEdit = (post) => {
+    setEditingPostId(post.id);
+    setEditingPostText(post.text || '');
+    setEditingPostImage(post.imageData || '');
+    setPostError('');
+  };
+
+  const savePostEdit = async (postId) => {
+    setPostSavingId(postId);
+    setPostError('');
+    try {
+      const res = await api.patch(`/posts/${postId}`, { text: editingPostText, imageData: editingPostImage });
+      setPosts((items) => items.map((post) => post.id === postId ? { ...post, ...res.data } : post));
+      setProfileData((profile) => profile ? { ...profile, posts: profile.posts.map((post) => post.id === postId ? { ...post, ...res.data } : post) } : profile);
+      setEditingPostId('');
+    } catch (err) {
+      setPostError(err.response?.data?.error || 'Could not save your post.');
+    } finally { setPostSavingId(''); }
+  };
+
+  const deletePost = async (postId) => {
+    if (!window.confirm('Delete this post? This cannot be undone.')) return;
+    setPostError('');
+    try {
+      await api.delete(`/posts/${postId}`);
+      setPosts((items) => items.filter((post) => post.id !== postId));
+      setProfileData((profile) => profile ? { ...profile, postCount: Math.max(0, profile.postCount - 1), posts: profile.posts.filter((post) => post.id !== postId) } : profile);
+    } catch (err) {
+      setPostError(err.response?.data?.error || 'Could not delete your post.');
+    }
   };
 
   const openProfile = async (username) => {
@@ -545,9 +618,14 @@ function App() {
   const fetchFriendships = async () => {
     try {
       const res = await api.get(`/friends/${currentUser.id}`);
-      setFriendships(res.data);
+      setFriendships((existing) => {
+        const alreadyAccepted = new Set(existing.filter((friend) => friend.status === 'accepted').map((friend) => friend.id));
+        return res.data.map((friend) => alreadyAccepted.has(friend.id) ? { ...friend, status: 'accepted' } : friend);
+      });
+      return true;
     } catch (err) {
       console.error(err);
+      return false;
     }
   };
 
@@ -572,12 +650,16 @@ function App() {
   };
 
   const acceptFriendRequest = async (requestId) => {
+    setFriendError('');
+    setFriendSuccess('');
+    setAcceptingRequestId(requestId);
     try {
       await api.post('/friends/accept', { requestId });
-      fetchFriendships();
-    } catch (err) {
-      console.error(err);
-    }
+      setFriendships((existing) => existing.map((friend) => friend.id === requestId ? { ...friend, status: 'accepted' } : friend));
+      if (!await fetchFriendships()) throw new Error('Could not refresh your friends list. Please refresh the page.');
+      setFriendSuccess('Friend request accepted. You can now chat and share tasks.');
+    } catch (err) { setFriendError(err.response?.data?.error || err.message || 'Could not accept this friend request. Please refresh and try again.'); }
+    finally { setAcceptingRequestId(''); }
   };
 
   // Chat API Handlers
@@ -959,13 +1041,17 @@ function App() {
           <form className="post-composer study-panel" onSubmit={publishPost}>
             <div className="post-author-line"><ProfileAvatar name={currentUser.displayName || currentUser.username} image={currentUser.avatarData} className="post-avatar post-avatar-you" onClick={() => openProfile(currentUser.username)} /><div><strong>{currentUser.displayName || currentUser.username}</strong><small>Share with your community</small></div></div>
             <textarea aria-label="Write a post" placeholder="What’s happening with your studies?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={3} />
-            <div className="post-compose-footer"><span className="post-visibility">🌍 Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={!postText.trim() || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'} <span>➤</span></button></div></div>
+            {postImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={postImage} alt="Selected post" /><button type="button" className="remove-post-image" onClick={() => setPostImage('')}>Remove photo</button></div>}
+            <div className="post-compose-footer"><label className="post-photo-button">📷 Add photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setPostImage); event.target.value = ''; }} /></label><span className="post-visibility">🌍 Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={(!postText.trim() && !postImage) || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'} <span>➤</span></button></div></div>
           </form>
           <div className="community-feed-heading"><div><span className="section-kicker">YOUR TIMELINE</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
           <div className="community-feed" aria-live="polite">
+            {postError && <p className="post-error feed-action-error" role="alert">{postError}</p>}
             {postsLoading && posts.length === 0 ? <div className="feed-empty"><span>⏳</span><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><span>⚠️</span><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><span>🌱</span><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
               <ProfileAvatar name={post.author} image={post.avatarData} className={`post-avatar post-avatar-${index % 4}`} onClick={() => openProfile(post.authorUsername || post.author)} />
-              <div className="community-post-body"><header><div><button type="button" className="post-author-link" onClick={() => openProfile(post.authorUsername || post.author)}>{post.author}</button><button type="button" className="post-handle-link" onClick={() => openProfile(post.authorUsername || post.author)}>@{post.authorUsername || post.author}</button><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div><span className="post-public-badge">✦ Community</span></header><p>{post.text}</p></div>
+              <div className="community-post-body"><header><div><button type="button" className="post-author-link" onClick={() => openProfile(post.authorUsername || post.author)}>{post.author}</button><button type="button" className="post-handle-link" onClick={() => openProfile(post.authorUsername || post.author)}>@{post.authorUsername || post.author}</button><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.authorUsername?.toLowerCase() === currentUser.username.toLowerCase() ? <div className="post-owner-actions"><button type="button" onClick={() => editingPostId === post.id ? setEditingPostId('') : beginPostEdit(post)}>{editingPostId === post.id ? 'Cancel' : 'Edit'}</button><button type="button" className="post-delete-button" onClick={() => deletePost(post.id)}>Delete</button></div> : <span className="post-public-badge">✦ Community</span>}</header>
+                {editingPostId === post.id ? <div className="post-inline-editor"><textarea aria-label="Edit post" value={editingPostText} onChange={(event) => setEditingPostText(event.target.value.slice(0, 1000))} maxLength={1000} rows={4} />{editingPostImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={editingPostImage} alt="Post attachment" /><button type="button" className="remove-post-image" onClick={() => setEditingPostImage('')}>Remove photo</button></div>}<div className="post-inline-actions"><label className="post-photo-button">📷 Change photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setEditingPostImage); event.target.value = ''; }} /></label><button className="colorful-button" type="button" disabled={postSavingId === post.id || (!editingPostText.trim() && !editingPostImage)} onClick={() => savePostEdit(post.id)}>{postSavingId === post.id ? 'Saving…' : 'Save changes'}</button></div></div> : <><p>{post.text}</p>{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}{post.editedAt && <span className="post-edited-label">Edited</span>}</>}
+              </div>
             </article>)}
           </div>
         </section>}
@@ -975,7 +1061,7 @@ function App() {
           {profileLoading ? <div className="feed-empty"><span>⏳</span><p>Loading profile…</p></div> : profileError && !profileData ? <div className="feed-empty"><span>⚠️</span><p>{profileError}</p></div> : profileData && <>
             <section className="profile-card study-panel"><div className="profile-cover" /><div className="profile-card-content"><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="profile-page-avatar" /><div className="profile-card-actions">{profileData.username === currentUser.username.toLowerCase() && <button type="button" className="profile-edit-button" onClick={startProfileEdit}>Edit profile</button>}</div><h2>{profileData.displayName}</h2><p className="profile-handle">@{profileData.username}</p>{profileData.bio && <p className="profile-bio">{profileData.bio}</p>}<p className="profile-joined">🎓 Studying with Gyanaegis since {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'recently'}</p><span className="profile-post-count"><strong>{profileData.postCount}</strong> {profileData.postCount === 1 ? 'post' : 'posts'}</span></div></section>
             <div className="profile-post-heading"><span className="section-kicker">THEIR TIMELINE</span><h3>Posts</h3></div>
-            <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div></header><p>{post.text}</p></div></article>) : <div className="feed-empty"><span>🌱</span><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
+            <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.editedAt && <span className="post-edited-label">Edited</span>}</header>{post.text && <p>{post.text}</p>}{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}</div></article>) : <div className="feed-empty"><span>🌱</span><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
           </>}
         </section>}
 
@@ -997,7 +1083,7 @@ function App() {
 
                 {pendingRequests.length > 0 && <div className="request-section">
                   <span className="sidebar-label">NEW REQUESTS <span>{pendingRequests.length}</span></span>
-                  {pendingRequests.map((req) => <div className="request-card" key={req.id}><span className="friend-avatar avatar-coral">{req.senderUsername.slice(0, 1).toUpperCase()}</span><div className="request-copy"><strong>{req.senderUsername}</strong><small>wants to connect</small></div><button type="button" className="accept-button" onClick={() => acceptFriendRequest(req.id)}>Accept</button></div>)}
+                  {pendingRequests.map((req) => <div className="request-card" key={req.id}><span className="friend-avatar avatar-coral">{req.senderUsername.slice(0, 1).toUpperCase()}</span><div className="request-copy"><strong>{req.senderUsername}</strong><small>wants to connect</small></div><button type="button" className="accept-button" disabled={acceptingRequestId === req.id} onClick={() => acceptFriendRequest(req.id)}>{acceptingRequestId === req.id ? 'Accepting…' : 'Accept'}</button></div>)}
                 </div>}
 
                 <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? '✦ Ready to chat' : ''}</span></div>

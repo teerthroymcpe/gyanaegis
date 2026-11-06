@@ -279,6 +279,12 @@ button, input, select { font: inherit; }
 .post-character-count { color: #8f8ca8; font-size: .7rem; font-variant-numeric: tabular-nums; }
 .post-error { color: #ffaaaa; font-size: .74rem; }
 .post-submit { padding: .65rem .9rem !important; border-radius: 12px !important; background: linear-gradient(110deg,#1db99f,#458fe2) !important; }
+.post-photo-button { display: inline-flex; align-items: center; gap: .35rem; padding: .48rem .7rem; border: 1px solid rgba(88,203,185,.25); border-radius: 99px; background: rgba(56,193,146,.08); color: #83d9c4; font-size: .74rem; font-weight: 750; cursor: pointer; }
+.post-photo-button:hover { background: rgba(56,193,146,.15); }
+.post-photo-button input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
+.post-image-preview-wrap { position: relative; align-self: flex-start; max-width: 100%; }
+.post-image-preview { display: block; max-width: min(100%, 360px); max-height: 280px; border: 1px solid rgba(178,169,231,.18); border-radius: 15px; object-fit: cover; }
+.remove-post-image { margin-top: .4rem; padding: .3rem 0; border: 0; background: transparent; color: #ffadad; font-size: .73rem; cursor: pointer; }
 .post-feed-count { padding: .42rem .65rem; border: 1px solid rgba(143,130,235,.18); border-radius: 99px; background: rgba(137,117,244,.08); color: #bcb3e8; font-size: .7rem; }
 .community-feed-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin: .45rem .2rem 0; }
 .community-feed-heading .section-kicker { margin-bottom: .3rem; color: #9d95dc; font-size: .62rem; }
@@ -299,6 +305,17 @@ button, input, select { font: inherit; }
 .post-author-link:hover { text-decoration: underline; }
 .post-handle-link, .post-handle-link-static { color: #9793b3; font-size: .7rem; }
 .post-handle-link:hover { color: #c4bcff; }
+.post-owner-actions { display: flex; align-items: center; gap: .25rem; }
+.post-owner-actions button { padding: .3rem .48rem; border: 1px solid rgba(178,169,231,.17); border-radius: 9px; background: rgba(255,255,255,.035); color: #bdb5e8; font-size: .68rem; font-weight: 700; cursor: pointer; }
+.post-owner-actions button:hover { background: rgba(146,126,255,.14); }
+.post-owner-actions .post-delete-button { color: #ffaaa9; }
+.post-attachment { display: block; width: min(100%, 560px); max-height: 520px; margin-top: .65rem; border: 1px solid rgba(178,169,231,.14); border-radius: 17px; object-fit: contain; background: rgba(0,0,0,.14); }
+.post-edited-label { color: #8f8ba8; font-size: .68rem; font-style: italic; }
+.post-inline-editor { display: flex; flex-direction: column; gap: .55rem; margin-top: .65rem; }
+.post-inline-editor textarea { width: 100%; resize: vertical; padding: .75rem; border: 1px solid rgba(174,165,228,.2); border-radius: 12px; background: #17182a; color: #f7f5ff; font: inherit; line-height: 1.5; }
+.post-inline-actions { display: flex; align-items: center; justify-content: space-between; gap: .65rem; }
+.post-inline-actions .colorful-button { padding: .48rem .75rem; border: 0; border-radius: 10px; background: linear-gradient(110deg,#1db99f,#458fe2); color: white; font-size: .74rem; font-weight: 800; cursor: pointer; }
+.feed-action-error { padding: .7rem 1rem; border-bottom: 1px solid rgba(178,169,231,.13); }
 .header-avatar { width: 27px; height: 27px; border-radius: 50%; background: linear-gradient(145deg,#45cbb4,#458fcb); }
 .app-topbar .user-badge { display: inline-flex; align-items: center; gap: .45rem; color: #eae7ff; cursor: pointer; }
 .profile-page { display: flex; flex-direction: column; gap: .9rem; max-width: 700px; margin: 0 auto; }
@@ -382,6 +399,7 @@ button, input, select { font: inherit; }
 .request-copy small, .friend-row-copy small { color: #9693b1; font-size: .69rem; }
 .accept-button { padding: .48rem .58rem; border: 0; border-radius: 10px; background: linear-gradient(110deg, #35c6a4, #49a9c6); color: #102b34; cursor: pointer; font-size: .71rem; font-weight: 800; transition: transform .18s ease, filter .18s ease; }
 .accept-button:hover { transform: translateY(-2px); filter: brightness(1.1); }
+.accept-button:disabled { opacity: .65; cursor: wait; transform: none; }
 .friend-list-heading { display: flex; justify-content: space-between; align-items: center; gap: .4rem; margin: 1.35rem 0 .65rem; }
 .online-note { color: #72d9bf; font-size: .66rem; }
 .friend-list { display: flex; flex-direction: column; gap: .42rem; }
