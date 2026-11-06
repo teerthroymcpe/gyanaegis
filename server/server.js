@@ -62,11 +62,14 @@ app.use(cors({
     return callback(error);
   }
 }));
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '256kb' }));
 
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true, lowercase: true, trim: true },
   displayUsername: { type: String, required: true, trim: true },
+  displayName: { type: String, trim: true, maxlength: 50, default: '' },
+  bio: { type: String, trim: true, maxlength: 240, default: '' },
+  avatarData: { type: String, default: '' },
   password: { type: String, required: true, select: false },
   email: { type: String, lowercase: true, trim: true, sparse: true, unique: true },
   pendingRecoveryEmail: { type: String, lowercase: true, trim: true, sparse: true, unique: true },
@@ -130,7 +133,8 @@ const Message = mongoose.model('Message', messageSchema);
 
 const postSchema = new mongoose.Schema({
   authorId: { type: String, required: true, index: true },
-  authorName: { type: String, required: true, maxlength: 32 },
+  authorName: { type: String, required: true, maxlength: 50 },
+  authorUsername: { type: String, maxlength: 32, default: '' },
   text: { type: String, required: true, trim: true, maxlength: 1000 }
 }, { timestamps: true });
 const Post = mongoose.model('Post', postSchema);
@@ -171,6 +175,10 @@ function publicUser(user) {
   return {
     id: user._id.toString(),
     username: user.displayUsername,
+    displayName: user.displayName || user.displayUsername,
+    bio: user.bio || '',
+    avatarData: user.avatarData || '',
+    createdAt: user.createdAt,
     recoveryEmail: user.email || user.pendingRecoveryEmail || '',
     recoveryEmailVerified: Boolean(user.emailVerified && user.email),
     hasRecoveryCode: Boolean(user.recoveryCodeHash),
@@ -492,7 +500,17 @@ app.use('/api', authenticate);
 app.get('/api/posts', async (req, res) => {
   try {
     const posts = await Post.find().sort({ _id: -1 }).limit(100).lean();
-    return res.json(posts.map((post) => ({ id: post._id.toString(), author: post.authorName, text: post.text, createdAt: post.createdAt })));
+    const authorIds = [...new Set(posts.map((post) => post.authorId))];
+    const authors = await User.find({ _id: { $in: authorIds } }).select('username displayUsername displayName avatarData').lean();
+    const authorById = new Map(authors.map((author) => [author._id.toString(), author]));
+    return res.json(posts.map((post) => {
+      const author = authorById.get(post.authorId);
+      return {
+        id: post._id.toString(), author: author?.displayName || author?.displayUsername || post.authorName,
+        authorUsername: author?.username || post.authorUsername || post.authorName.toLowerCase(),
+        avatarData: author?.avatarData || '', text: post.text, createdAt: post.createdAt
+      };
+    }));
   } catch (error) {
     reportFailure('Load community posts failed', error);
     return res.status(500).json({ error: 'Could not load posts.' });
@@ -503,13 +521,33 @@ app.post('/api/posts', async (req, res) => {
   try {
     const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
     if (!text || text.length > 1000) return res.status(400).json({ error: 'Write a post between 1 and 1000 characters.' });
-    const author = await User.findById(req.userId).select('displayUsername');
+    const author = await User.findById(req.userId).select('username displayUsername displayName avatarData');
     if (!author) return res.status(404).json({ error: 'Account not found.' });
-    const post = await Post.create({ authorId: req.userId, authorName: author.displayUsername, text });
-    return res.status(201).json({ id: post._id.toString(), author: post.authorName, text: post.text, createdAt: post.createdAt });
+    const post = await Post.create({ authorId: req.userId, authorName: author.displayName || author.displayUsername, authorUsername: author.username, text });
+    return res.status(201).json({ id: post._id.toString(), author: post.authorName, authorUsername: author.username, avatarData: author.avatarData || '', text: post.text, createdAt: post.createdAt });
   } catch (error) {
     reportFailure('Create community post failed', error);
     return res.status(500).json({ error: 'Could not publish your post.' });
+  }
+});
+
+app.get('/api/profiles/:username', async (req, res) => {
+  try {
+    const username = typeof req.params.username === 'string' ? req.params.username.trim().toLowerCase() : '';
+    const user = await User.findOne({ username }).select('username displayUsername displayName bio avatarData createdAt').lean();
+    if (!user) return res.status(404).json({ error: 'Profile not found.' });
+    const [posts, postCount] = await Promise.all([
+      Post.find({ authorId: user._id.toString() }).sort({ _id: -1 }).limit(100).lean(),
+      Post.countDocuments({ authorId: user._id.toString() })
+    ]);
+    return res.json({
+      username: user.username, displayUsername: user.displayUsername, displayName: user.displayName || user.displayUsername,
+      bio: user.bio || '', avatarData: user.avatarData || '', createdAt: user.createdAt, postCount,
+      posts: posts.map((post) => ({ id: post._id.toString(), text: post.text, createdAt: post.createdAt }))
+    });
+  } catch (error) {
+    reportFailure('Load profile failed', error);
+    return res.status(500).json({ error: 'Could not load this profile.' });
   }
 });
 
@@ -521,6 +559,29 @@ app.get('/api/auth/me', async (req, res) => {
   } catch (error) {
     reportFailure('Load account failed', error);
     return res.status(500).json({ error: 'Could not load account.' });
+  }
+});
+
+app.put('/api/profile', async (req, res) => {
+  try {
+    const displayName = typeof req.body?.displayName === 'string' ? req.body.displayName.trim() : '';
+    const bio = typeof req.body?.bio === 'string' ? req.body.bio.trim() : '';
+    const avatarData = typeof req.body?.avatarData === 'string' ? req.body.avatarData : '';
+    if (!displayName || displayName.length > 50) return res.status(400).json({ error: 'Display name must be between 1 and 50 characters.' });
+    if (bio.length > 240) return res.status(400).json({ error: 'Bio must be 240 characters or less.' });
+    if (avatarData && (avatarData.length > 180000 || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(avatarData))) {
+      return res.status(400).json({ error: 'Choose a smaller JPG, PNG, or WebP profile photo.' });
+    }
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'Account not found.' });
+    user.displayName = displayName;
+    user.bio = bio;
+    user.avatarData = avatarData;
+    await user.save();
+    return res.json({ user: publicUser(user) });
+  } catch (error) {
+    reportFailure('Update profile failed', error);
+    return res.status(500).json({ error: 'Could not save your profile.' });
   }
 });
 

@@ -18,6 +18,13 @@ api.interceptors.response.use((response) => response, (error) => {
   return Promise.reject(error);
 });
 
+function ProfileAvatar({ name, image, className = '', onClick }) {
+  const Tag = onClick ? 'button' : 'span';
+  return <Tag className={`profile-avatar ${className}`} type={onClick ? 'button' : undefined} onClick={onClick} aria-label={onClick ? `View ${name}'s profile` : undefined}>
+    {image ? <img src={image} alt="" /> : (name?.trim()?.[0] || '?').toUpperCase()}
+  </Tag>;
+}
+
 function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     if (!localStorage.getItem('gy_cloud_token')) return null;
@@ -86,6 +93,15 @@ function App() {
   const [postsLoadError, setPostsLoadError] = useState('');
   const [postsLoading, setPostsLoading] = useState(false);
   const [postSubmitting, setPostSubmitting] = useState(false);
+  const [profileData, setProfileData] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileReturnTab, setProfileReturnTab] = useState('posts');
+  const [profileEditOpen, setProfileEditOpen] = useState(false);
+  const [profileDraftName, setProfileDraftName] = useState('');
+  const [profileDraftBio, setProfileDraftBio] = useState('');
+  const [profileDraftAvatar, setProfileDraftAvatar] = useState('');
+  const [profileSaving, setProfileSaving] = useState(false);
 
   const [teamTasks, setTeamTasks] = useState([]);
   const [newTeamTaskTitle, setNewTeamTaskTitle] = useState('');
@@ -351,6 +367,68 @@ function App() {
     } catch (err) {
       setPostError(err.response?.data?.error || 'Could not publish your post.');
     } finally { setPostSubmitting(false); }
+  };
+
+  const openProfile = async (username) => {
+    if (!username) return;
+    setProfileReturnTab(activeTab === 'profile' ? profileReturnTab : activeTab);
+    setActiveTab('profile');
+    setProfileData(null);
+    setProfileError('');
+    setProfileLoading(true);
+    try {
+      const res = await api.get(`/profiles/${encodeURIComponent(username)}`);
+      setProfileData(res.data);
+    } catch (err) {
+      setProfileError(err.response?.data?.error || 'Could not load this profile.');
+    } finally { setProfileLoading(false); }
+  };
+
+  const startProfileEdit = () => {
+    setProfileDraftName(profileData?.displayName || currentUser.displayName || currentUser.username);
+    setProfileDraftBio(profileData?.bio || currentUser.bio || '');
+    setProfileDraftAvatar(profileData?.avatarData || currentUser.avatarData || '');
+    setProfileError('');
+    setProfileEditOpen(true);
+  };
+
+  const selectProfilePhoto = (file) => {
+    if (!file) return;
+    if (!file.type.startsWith('image/')) return setProfileError('Choose an image file for your profile photo.');
+    const reader = new FileReader();
+    reader.onerror = () => setProfileError('Could not read that image.');
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => setProfileError('Could not open that image.');
+      image.onload = () => {
+        const side = Math.min(image.width, image.height);
+        const canvas = document.createElement('canvas');
+        canvas.width = 288;
+        canvas.height = 288;
+        canvas.getContext('2d').drawImage(image, (image.width - side) / 2, (image.height - side) / 2, side, side, 0, 0, 288, 288);
+        const photo = canvas.toDataURL('image/jpeg', 0.72);
+        if (photo.length > 180000) return setProfileError('That photo is too large. Choose a smaller image.');
+        setProfileDraftAvatar(photo);
+        setProfileError('');
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    setProfileSaving(true);
+    setProfileError('');
+    try {
+      const res = await api.put('/profile', { displayName: profileDraftName, bio: profileDraftBio, avatarData: profileDraftAvatar });
+      setCurrentUser(res.data.user);
+      setProfileData((profile) => ({ ...profile, ...res.data.user, username: currentUser.username.toLowerCase() }));
+      setProfileEditOpen(false);
+      fetchPosts();
+    } catch (err) {
+      setProfileError(err.response?.data?.error || 'Could not save your profile.');
+    } finally { setProfileSaving(false); }
   };
 
   const localDate = () => {
@@ -671,7 +749,7 @@ function App() {
           <h1 style={styles.logoText}>Gyanaegis Academic Hub</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span className="user-badge" style={styles.userBadge}>👤 {currentUser.username}</span>
+          <button className="user-badge" style={styles.userBadge} onClick={() => openProfile(currentUser.username)}><ProfileAvatar name={currentUser.displayName || currentUser.username} image={currentUser.avatarData} className="header-avatar" /> {currentUser.displayName || currentUser.username}</button>
           <button onClick={async () => {
             setRecoveryError('');
             setRecoveryMessage('');
@@ -756,6 +834,20 @@ function App() {
             {taskFormError && <p className="form-error" role="alert">{taskFormError}</p>}
             <div className="composer-actions"><button className="composer-cancel" type="button" onClick={() => setTaskComposerOpen(false)}>Cancel</button><button className="colorful-button" type="submit" style={styles.button} disabled={!acceptedFriends.length}>Share task</button></div>
           </form>}
+        </section>
+      </div>}
+
+      {profileEditOpen && <div className="modalBackdrop profile-edit-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setProfileEditOpen(false); }}>
+        <section className="profile-edit-card" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
+          <div className="profile-edit-heading"><div><span className="section-kicker">MAKE IT YOURS</span><h2 id="profileEditTitle">Edit profile</h2></div><button type="button" className="composer-close" aria-label="Close" onClick={() => setProfileEditOpen(false)}>×</button></div>
+          <form className="profile-edit-form" onSubmit={saveProfile}>
+            <label className="profile-photo-picker"><ProfileAvatar name={profileDraftName} image={profileDraftAvatar} className="profile-edit-avatar" /><span><strong>Change profile photo</strong><small>Square photo, centered automatically</small><input type="file" accept="image/*" onChange={(event) => selectProfilePhoto(event.target.files?.[0])} /></span></label>
+            <label>Display name<input className="colorful-input" value={profileDraftName} onChange={(event) => setProfileDraftName(event.target.value.slice(0, 50))} maxLength={50} required /></label>
+            <label>Bio <small>{profileDraftBio.length}/240</small><textarea className="colorful-input profile-bio-input" value={profileDraftBio} onChange={(event) => setProfileDraftBio(event.target.value.slice(0, 240))} maxLength={240} rows={4} placeholder="A little about you…" /></label>
+            <p className="profile-handle-note">Your username stays <strong>@{currentUser.username}</strong> so friends can always find you.</p>
+            {profileError && <p className="form-error" role="alert">{profileError}</p>}
+            <div className="composer-actions"><button className="composer-cancel" type="button" onClick={() => setProfileEditOpen(false)}>Cancel</button><button className="colorful-button" type="submit" disabled={profileSaving}>{profileSaving ? 'Saving…' : 'Save profile'}</button></div>
+          </form>
         </section>
       </div>}
 
@@ -863,19 +955,28 @@ function App() {
         )}
 
         {activeTab === 'posts' && <section className="community-page">
-          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Share what’s on your mind ✨</h2><p>Celebrate a win, share a study tip, or cheer someone on. Your post is visible to everyone on Gyanaegis.</p></div><span className="community-hero-art" aria-hidden="true">🌈</span></div>
+          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Your study circle ✨</h2><p>Share a win, ask for advice, and cheer each other on.</p></div><span className="community-hero-art" aria-hidden="true">🌈</span></div>
           <form className="post-composer study-panel" onSubmit={publishPost}>
-            <div className="post-author-line"><span className="post-avatar post-avatar-you">{currentUser.username.slice(0, 1).toUpperCase()}</span><div><strong>{currentUser.username}</strong><small>Posting to everyone</small></div></div>
-            <textarea aria-label="Write a post" placeholder="What would you like to share with the community?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={4} />
-            <div className="post-compose-footer"><span className="post-visibility">🌍 Everyone can see this</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={!postText.trim() || postSubmitting}>{postSubmitting ? 'Posting…' : 'Share post'} <span>➤</span></button></div></div>
+            <div className="post-author-line"><ProfileAvatar name={currentUser.displayName || currentUser.username} image={currentUser.avatarData} className="post-avatar post-avatar-you" onClick={() => openProfile(currentUser.username)} /><div><strong>{currentUser.displayName || currentUser.username}</strong><small>Share with your community</small></div></div>
+            <textarea aria-label="Write a post" placeholder="What’s happening with your studies?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={3} />
+            <div className="post-compose-footer"><span className="post-visibility">🌍 Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={!postText.trim() || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'} <span>➤</span></button></div></div>
           </form>
-          <div className="community-feed-heading"><div><span className="section-kicker">FROM YOUR COMMUNITY</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
+          <div className="community-feed-heading"><div><span className="section-kicker">YOUR TIMELINE</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
           <div className="community-feed" aria-live="polite">
             {postsLoading && posts.length === 0 ? <div className="feed-empty"><span>⏳</span><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><span>⚠️</span><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><span>🌱</span><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
-              <span className={`post-avatar post-avatar-${index % 4}`}>{post.author.slice(0, 1).toUpperCase()}</span>
-              <div className="community-post-body"><header><div><strong>{post.author}</strong><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div><span className="post-public-badge">🌍 Public</span></header><p>{post.text}</p></div>
+              <ProfileAvatar name={post.author} image={post.avatarData} className={`post-avatar post-avatar-${index % 4}`} onClick={() => openProfile(post.authorUsername || post.author)} />
+              <div className="community-post-body"><header><div><button type="button" className="post-author-link" onClick={() => openProfile(post.authorUsername || post.author)}>{post.author}</button><button type="button" className="post-handle-link" onClick={() => openProfile(post.authorUsername || post.author)}>@{post.authorUsername || post.author}</button><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div><span className="post-public-badge">✦ Community</span></header><p>{post.text}</p></div>
             </article>)}
           </div>
+        </section>}
+
+        {activeTab === 'profile' && <section className="profile-page">
+          <button className="profile-back" type="button" onClick={() => setActiveTab(profileReturnTab)}>← Back to {profileReturnTab === 'friends' ? 'friends' : 'posts'}</button>
+          {profileLoading ? <div className="feed-empty"><span>⏳</span><p>Loading profile…</p></div> : profileError && !profileData ? <div className="feed-empty"><span>⚠️</span><p>{profileError}</p></div> : profileData && <>
+            <section className="profile-card study-panel"><div className="profile-cover" /><div className="profile-card-content"><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="profile-page-avatar" /><div className="profile-card-actions">{profileData.username === currentUser.username.toLowerCase() && <button type="button" className="profile-edit-button" onClick={startProfileEdit}>Edit profile</button>}</div><h2>{profileData.displayName}</h2><p className="profile-handle">@{profileData.username}</p>{profileData.bio && <p className="profile-bio">{profileData.bio}</p>}<p className="profile-joined">🎓 Studying with Gyanaegis since {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'recently'}</p><span className="profile-post-count"><strong>{profileData.postCount}</strong> {profileData.postCount === 1 ? 'post' : 'posts'}</span></div></section>
+            <div className="profile-post-heading"><span className="section-kicker">THEIR TIMELINE</span><h3>Posts</h3></div>
+            <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div></header><p>{post.text}</p></div></article>) : <div className="feed-empty"><span>🌱</span><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
+          </>}
         </section>}
 
         {activeTab === 'friends' && (
@@ -901,23 +1002,22 @@ function App() {
 
                 <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? '✦ Ready to chat' : ''}</span></div>
                 <div className="friend-list">
-                  {acceptedFriends.length === 0 ? <div className="sidebar-empty"><span>🌱</span><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <button
+                  {acceptedFriends.length === 0 ? <div className="sidebar-empty"><span>🌱</span><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <div
                     className={`friend-row ${selectedFriend?.friendId === friend.friendId ? 'friend-selected' : ''}`}
                     key={friend.id}
-                    type="button"
-                    onClick={() => { setSelectedFriend(friend); fetchMessages(friend.friendId); }}
                   >
-                    <span className={`friend-avatar avatar-${index % 4}`}>{friend.friendUsername.slice(0, 1).toUpperCase()}</span>
-                    <span className="friend-row-copy"><strong>{friend.friendUsername}</strong><small>{selectedFriend?.friendId === friend.friendId ? 'Chat is open' : 'Study buddy'}</small></span>
+                    <ProfileAvatar name={friend.friendUsername} className={`friend-avatar avatar-${index % 4}`} onClick={() => openProfile(friend.friendUsername)} />
+                    <button type="button" className="friend-row-main" onClick={() => { setSelectedFriend(friend); fetchMessages(friend.friendId); }}><span className="friend-row-copy"><strong>{friend.friendUsername}</strong><small>{selectedFriend?.friendId === friend.friendId ? 'Chat is open' : 'Study buddy'}</small></span>
                     <span className="friend-row-arrow">›</span>
-                  </button>)}
+                    </button>
+                  </div>)}
                 </div>
               </aside>
 
               <section className="chat-panel study-panel" aria-label="Friend chat">
                 {selectedFriend ? <>
                   <div className="chat-header">
-                    <span className="friend-avatar avatar-chat">{selectedFriend.friendUsername.slice(0, 1).toUpperCase()}</span>
+                    <ProfileAvatar name={selectedFriend.friendUsername} className="friend-avatar avatar-chat" onClick={() => openProfile(selectedFriend.friendUsername)} />
                     <div className="chat-header-copy"><span className="section-kicker">YOUR STUDY BUDDY</span><h3>{selectedFriend.friendUsername}</h3></div>
                     <span className="chat-connected">✦ Connected</span>
                   </div>
