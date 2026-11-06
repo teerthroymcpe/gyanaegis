@@ -252,7 +252,6 @@ button, input, select { font: inherit; }
 .focus-empty strong { color: #d2c8ff; }
 .section-count { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 .45rem; border: 1px solid rgba(143,130,235,.2); border-radius: 99px; background: rgba(137,117,244,.1); color: #c0b4ff; font-size: .72rem; font-weight: 800; }
 
-/* Community posts */
 .community-page { display: flex; flex-direction: column; gap: 1rem; max-width: 700px; margin: 0 auto; }
 .community-hero { position: relative; display: flex; align-items: center; justify-content: space-between; min-height: 190px; overflow: hidden; padding: clamp(1.4rem,3vw,2.2rem); border: 1px solid rgba(210,245,204,.24); border-radius: 24px; background: linear-gradient(115deg,#168c83,#4fae9a 45%,#93bd68); box-shadow: 0 18px 45px rgba(20,95,78,.18); }
 .community-hero::after { content: ''; position: absolute; width: 230px; height: 230px; right: 8%; top: -155px; border-radius: 50%; background: rgba(255,255,255,.13); }
@@ -354,7 +353,6 @@ button, input, select { font: inherit; }
 .feed-empty h4 { margin: .1rem 0 .35rem; color: #eeeaff; }
 .feed-empty p { max-width: 360px; margin: 0; color: #9693b1; font-size: .82rem; line-height: 1.55; }
 
-/* Friends and chat */
 .social-page { display: flex; flex-direction: column; gap: 1.15rem; }
 .social-hero {
   position: relative;
