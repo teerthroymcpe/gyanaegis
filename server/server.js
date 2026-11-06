@@ -105,7 +105,7 @@ const Task = mongoose.model('Task', taskSchema);
 const studyGoalSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
   title: { type: String, required: true, trim: true, maxlength: 120 },
-  targetDate: { type: String, required: true },
+  targetDate: { type: String, default: '' },
   subjects: [{ type: String, trim: true, maxlength: 60 }],
   minutesPerDay: { type: Number, required: true, min: 15, max: 240 }
 }, { timestamps: true });
@@ -581,7 +581,7 @@ app.post('/api/study-goals', async (req, res) => {
       : [];
     const today = new Date().toISOString().slice(0, 10);
     if (!title || title.length > 120) return res.status(400).json({ error: 'Enter a goal under 120 characters.' });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate) || targetDate < today) return res.status(400).json({ error: 'Choose a future exam or target date.' });
+    if (targetDate && (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate) || targetDate < today)) return res.status(400).json({ error: 'Choose today or a future target date.' });
     if (!Number.isInteger(minutesPerDay) || minutesPerDay < 15 || minutesPerDay > 240) return res.status(400).json({ error: 'Daily study time must be 15 to 240 minutes.' });
     const goal = await StudyGoal.create({ userId: req.userId, title, targetDate, subjects, minutesPerDay });
     return res.status(201).json({ id: goal._id.toString(), title: goal.title, targetDate: goal.targetDate, subjects: goal.subjects, minutesPerDay: goal.minutesPerDay });
@@ -595,7 +595,10 @@ app.get('/api/study-plan/today', async (req, res) => {
   try {
     const date = typeof req.query.date === 'string' ? req.query.date : '';
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'A valid local date is required.' });
-    const goals = await StudyGoal.find({ userId: req.userId, targetDate: { $gte: date } });
+    const goals = await StudyGoal.find({
+      userId: req.userId,
+      $or: [{ targetDate: { $gte: date } }, { targetDate: '' }, { targetDate: { $exists: false } }]
+    });
     for (const goal of goals) {
       const existing = await Task.exists({ userId: req.userId, goalId: goal._id, plannedDate: date });
       if (existing) continue;

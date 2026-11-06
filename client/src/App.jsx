@@ -329,6 +329,15 @@ function App() {
 
   const formatTimer = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
+  const getDaysRemaining = (date) => {
+    if (!date) return null;
+    const [year, month, day] = date.split('-').map(Number);
+    const today = new Date();
+    const targetDay = Date.UTC(year, month - 1, day);
+    const todayDay = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+    return Math.max(0, Math.round((targetDay - todayDay) / 86400000));
+  };
+
   const updateStudyTimer = async (task, action) => {
     setTimerError('');
     try {
@@ -682,12 +691,12 @@ function App() {
               <h3 style={{ marginTop: 0 }}>Your study goals</h3>
               {studyGoals.length > 0 && <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
                 {studyGoals.map((goal) => <span key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
-                  🎯 {goal.title} · target {new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}
+                  🎯 {goal.title} · {goal.targetDate ? `📅 ${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : '📅 No deadline set'}
                 </span>)}
               </div>}
               <form onSubmit={createStudyGoal} style={{ ...styles.taskForm, marginTop: '1rem' }}>
                 <input type="text" placeholder="What are you preparing for? (e.g. Biology exam)" style={styles.input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required />
-                <input type="date" aria-label="Exam or target date" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} required />
+                <input type="date" aria-label="Target date (optional)" title="Target date (optional)" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} />
                 <input type="text" placeholder="Subjects or topics, separated by commas (optional)" style={styles.input} value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} />
                 <select aria-label="Daily study time" style={styles.actionSelect} value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}>
                   <option value="30">30 minutes a day</option><option value="60">1 hour a day</option><option value="90">1.5 hours a day</option><option value="120">2 hours a day</option><option value="180">3 hours a day</option>
@@ -699,30 +708,36 @@ function App() {
 
             <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
               <h3 style={{ marginTop: 0 }}>Today’s study plan</h3>
-              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>Start a focused timer for each session. Pause whenever you need; 10 points are added automatically when the timer finishes.</p>
+              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>The countdown stays visible while you study. Pause whenever you need; 10 points are added automatically when the full time is up.</p>
               {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
               <div style={styles.taskList}>
                 {dailyPlan.tasks.length === 0 ? (
                   <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Create a study goal above and we’ll build your first daily plan.'}</p>
                 ) : (
                   dailyPlan.tasks.map((task) => (
-                    <div key={task.id} style={{ ...styles.taskItem, background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                    <div key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 260px' }}>
                         <span style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
                         <div><strong>{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
-                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : task.timerState === 'running' ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <strong aria-live="polite" style={{ fontVariantNumeric: 'tabular-nums', fontSize: '1.2rem', color: '#7dd3fc' }}>{formatTimer(getTaskSecondsLeft(task))}</strong>
-                          <button type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Pause</button>
+                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div style={{ textAlign: 'right', minWidth: '116px' }}>
+                            <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                              {task.timerState === 'running' ? 'Time remaining' : task.timerState === 'paused' ? 'Paused · remaining' : 'Session length'}
+                            </span>
+                            <strong aria-live="off" style={{ fontVariantNumeric: 'tabular-nums', fontSize: '1.35rem', lineHeight: 1.4, color: task.timerState === 'paused' ? '#fbbf24' : '#7dd3fc' }}>
+                              {formatTimer(getTaskSecondsLeft(task))}
+                            </strong>
+                          </div>
+                          {task.timerState === 'running' ? (
+                            <button type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Pause</button>
+                          ) : task.timerState === 'paused' ? (
+                            <button type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>Resume</button>
+                          ) : (
+                            <button type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>Start timer</button>
+                          )}
                         </div>
-                      ) : task.timerState === 'paused' ? (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <strong style={{ fontVariantNumeric: 'tabular-nums', color: '#fbbf24' }}>{formatTimer(getTaskSecondsLeft(task))} paused</strong>
-                          <button type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>Resume</button>
-                        </div>
-                      ) : (
-                        <button type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>Start {Math.ceil((task.timerDurationSeconds || 0) / 60)} min timer</button>
                       )}
                     </div>
                   ))
