@@ -5,8 +5,8 @@
 Install dependencies and start the Vite development server:
 
 ```sh
-npm install
-npm start
+npm ci
+npm run dev
 ```
 
 The client is served at <http://localhost:5173>. The API is expected at
