@@ -86,7 +86,26 @@ const taskSchema = new mongoose.Schema({
   status: { type: String, enum: ['Ongoing', 'Complete', 'Dropped'], default: 'Ongoing' },
   dueDate: { type: String, default: 'Upcoming' }
 }, { timestamps: true });
+taskSchema.add({
+  goalId: { type: mongoose.Schema.Types.ObjectId, ref: 'StudyGoal' },
+  plannedDate: { type: String },
+  points: { type: Number, default: 0 },
+  completedAt: { type: Date }
+});
+taskSchema.index({ userId: 1, goalId: 1, plannedDate: 1, title: 1 }, {
+  unique: true,
+  partialFilterExpression: { goalId: { $type: 'objectId' }, plannedDate: { $type: 'string' } }
+});
 const Task = mongoose.model('Task', taskSchema);
+
+const studyGoalSchema = new mongoose.Schema({
+  userId: { type: String, required: true, index: true },
+  title: { type: String, required: true, trim: true, maxlength: 120 },
+  targetDate: { type: String, required: true },
+  subjects: [{ type: String, trim: true, maxlength: 60 }],
+  minutesPerDay: { type: Number, required: true, min: 15, max: 240 }
+}, { timestamps: true });
+const StudyGoal = mongoose.model('StudyGoal', studyGoalSchema);
 
 const friendshipSchema = new mongoose.Schema({
   senderId: { type: String, required: true, index: true },
@@ -531,10 +550,81 @@ app.get('/api/tasks/:userId', async (req, res) => {
   try {
     if (req.params.userId !== req.userId) return res.status(403).json({ error: 'Not allowed.' });
     const tasks = await Task.find({ userId: req.userId });
-    return res.json(tasks.map((task) => ({ id: task._id.toString(), title: task.title, status: task.status, dueDate: task.dueDate })));
+    return res.json(tasks.map((task) => ({ id: task._id.toString(), title: task.title, status: task.status, dueDate: task.dueDate, goalId: task.goalId?.toString(), plannedDate: task.plannedDate, points: task.points || 0, completedAt: task.completedAt })));
   } catch (error) {
     reportFailure('Load tasks failed', error);
     return res.status(500).json({ error: 'Could not load tasks.' });
+  }
+});
+
+app.get('/api/study-goals', async (req, res) => {
+  try {
+    const goals = await StudyGoal.find({ userId: req.userId }).sort({ createdAt: 1 });
+    return res.json(goals.map((goal) => ({ id: goal._id.toString(), title: goal.title, targetDate: goal.targetDate, subjects: goal.subjects, minutesPerDay: goal.minutesPerDay })));
+  } catch (error) {
+    reportFailure('Load study goals failed', error);
+    return res.status(500).json({ error: 'Could not load study goals.' });
+  }
+});
+
+app.post('/api/study-goals', async (req, res) => {
+  try {
+    const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+    const targetDate = typeof req.body?.targetDate === 'string' ? req.body.targetDate : '';
+    const minutesPerDay = Number(req.body?.minutesPerDay);
+    const subjects = Array.isArray(req.body?.subjects)
+      ? [...new Set(req.body.subjects.filter((subject) => typeof subject === 'string').map((subject) => subject.trim()).filter(Boolean).map((subject) => subject.slice(0, 60)))].slice(0, 12)
+      : [];
+    const today = new Date().toISOString().slice(0, 10);
+    if (!title || title.length > 120) return res.status(400).json({ error: 'Enter a goal under 120 characters.' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(targetDate) || targetDate < today) return res.status(400).json({ error: 'Choose a future exam or target date.' });
+    if (!Number.isInteger(minutesPerDay) || minutesPerDay < 15 || minutesPerDay > 240) return res.status(400).json({ error: 'Daily study time must be 15 to 240 minutes.' });
+    const goal = await StudyGoal.create({ userId: req.userId, title, targetDate, subjects, minutesPerDay });
+    return res.status(201).json({ id: goal._id.toString(), title: goal.title, targetDate: goal.targetDate, subjects: goal.subjects, minutesPerDay: goal.minutesPerDay });
+  } catch (error) {
+    reportFailure('Create study goal failed', error);
+    return res.status(500).json({ error: 'Could not create study goal.' });
+  }
+});
+
+app.get('/api/study-plan/today', async (req, res) => {
+  try {
+    const date = typeof req.query.date === 'string' ? req.query.date : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ error: 'A valid local date is required.' });
+    const goals = await StudyGoal.find({ userId: req.userId, targetDate: { $gte: date } });
+    for (const goal of goals) {
+      const existing = await Task.exists({ userId: req.userId, goalId: goal._id, plannedDate: date });
+      if (existing) continue;
+      const dayNumber = Math.floor((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${goal.createdAt.toISOString().slice(0, 10)}T00:00:00Z`)) / 86400000);
+      const subject = goal.subjects.length ? goal.subjects[Math.max(dayNumber, 0) % goal.subjects.length] : goal.title;
+      const count = Math.max(1, Math.min(3, Math.ceil(goal.minutesPerDay / 30)));
+      const minutes = Math.floor(goal.minutesPerDay / count);
+      const steps = [
+        `Review key ideas: ${subject}`,
+        `Practice questions: ${subject}`,
+        `Recall and summarize: ${subject}`
+      ];
+      await Task.insertMany(steps.slice(0, count).map((title) => ({
+        userId: req.userId,
+        goalId: goal._id,
+        plannedDate: date,
+        title: `${title} (${minutes} min)`,
+        dueDate: date,
+        points: 10
+      })), { ordered: false }).catch((error) => { if (error.code !== 11000 && !error.writeErrors?.every((entry) => entry.code === 11000)) throw error; });
+    }
+    const [tasks, score] = await Promise.all([
+      Task.find({ userId: req.userId, plannedDate: date }).sort({ createdAt: 1 }),
+      Task.aggregate([{ $match: { userId: req.userId, goalId: { $exists: true }, status: 'Complete' } }, { $group: { _id: null, points: { $sum: '$points' }, completed: { $sum: 1 } } }])
+    ]);
+    return res.json({
+      tasks: tasks.map((task) => ({ id: task._id.toString(), title: task.title, status: task.status, points: task.points || 10, goalId: task.goalId?.toString() })),
+      score: score[0]?.points || 0,
+      totalCompleted: score[0]?.completed || 0
+    });
+  } catch (error) {
+    reportFailure('Load daily study plan failed', error);
+    return res.status(500).json({ error: 'Could not prepare today’s study plan.' });
   }
 });
 
@@ -554,9 +644,10 @@ app.put('/api/tasks/:id', async (req, res) => {
   try {
     const status = req.body?.status;
     if (!['Ongoing', 'Complete', 'Dropped'].includes(status)) return res.status(400).json({ error: 'Invalid task status.' });
-    const updated = await Task.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, { status }, { returnDocument: 'after', runValidators: true });
+    const update = { status, completedAt: status === 'Complete' ? new Date() : null };
+    const updated = await Task.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, update, { returnDocument: 'after', runValidators: true });
     if (!updated) return res.status(404).json({ error: 'Task not found.' });
-    return res.json({ id: updated._id.toString(), title: updated.title, status: updated.status, dueDate: updated.dueDate });
+    return res.json({ id: updated._id.toString(), title: updated.title, status: updated.status, dueDate: updated.dueDate, points: updated.points || 0, completedAt: updated.completedAt });
   } catch (error) {
     reportFailure('Update task failed', error);
     return res.status(500).json({ error: 'Could not update task.' });

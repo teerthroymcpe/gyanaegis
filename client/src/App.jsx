@@ -55,6 +55,14 @@ function App() {
   const [tasks, setTasks] = useState([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [newTaskDueDate, setNewTaskDueDate] = useState('');
+  const [studyGoals, setStudyGoals] = useState([]);
+  const [dailyPlan, setDailyPlan] = useState({ tasks: [], score: 0, totalCompleted: 0 });
+  const [goalTitle, setGoalTitle] = useState('');
+  const [goalTargetDate, setGoalTargetDate] = useState('');
+  const [goalSubjects, setGoalSubjects] = useState('');
+  const [goalMinutes, setGoalMinutes] = useState('60');
+  const [goalError, setGoalError] = useState('');
+  const [goalSaving, setGoalSaving] = useState(false);
 
   const [friendships, setFriendships] = useState([]);
   const [friendUsernameInput, setFriendUsernameInput] = useState('');
@@ -109,6 +117,8 @@ function App() {
   useEffect(() => {
     if (currentUser) {
       fetchUserTasks();
+      fetchStudyGoals();
+      fetchDailyPlan();
       fetchFriendships();
       fetchTeamTasks();
     }
@@ -271,6 +281,45 @@ function App() {
     }
   };
 
+  const localDate = () => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  };
+
+  const fetchStudyGoals = async () => {
+    try {
+      const res = await api.get('/study-goals');
+      setStudyGoals(res.data);
+    } catch (err) { console.error(err); }
+  };
+
+  const fetchDailyPlan = async () => {
+    try {
+      const res = await api.get('/study-plan/today', { params: { date: localDate() } });
+      setDailyPlan(res.data);
+    } catch (err) { console.error(err); }
+  };
+
+  const createStudyGoal = async (e) => {
+    e.preventDefault();
+    setGoalError('');
+    setGoalSaving(true);
+    try {
+      await api.post('/study-goals', {
+        title: goalTitle.trim(),
+        targetDate: goalTargetDate,
+        subjects: goalSubjects.split(',').map((subject) => subject.trim()).filter(Boolean),
+        minutesPerDay: Number(goalMinutes)
+      });
+      setGoalTitle('');
+      setGoalSubjects('');
+      setGoalTargetDate('');
+      await Promise.all([fetchStudyGoals(), fetchDailyPlan()]);
+    } catch (err) {
+      setGoalError(err.response?.data?.error || 'Could not create your study goal.');
+    } finally { setGoalSaving(false); }
+  };
+
   const addTask = async (e) => {
     e.preventDefault();
     if (!newTaskTitle.trim() || !currentUser) return;
@@ -293,6 +342,7 @@ function App() {
     try {
       await api.put(`/tasks/${taskId}`, { status: newStatus });
       setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+      await fetchDailyPlan();
     } catch (err) {
       console.error(err);
     }
@@ -565,57 +615,82 @@ function App() {
         {activeTab === 'dashboard' && (
           <>
             <div style={styles.welcomeCard}>
-              <h2>Welcome back, {currentUser.username}! 🚀</h2>
-              <p>Manage your personal study goals and workload on the Cloud.</p>
+              <h2>Your next step starts today, {currentUser.username} 🌱</h2>
+              <p>Small, steady study sessions add up. Set a goal and we’ll help you keep moving.</p>
             </div>
 
             <div style={styles.statsGrid}>
               <div style={styles.statCard}>
-                <p style={styles.statLabel}>Total Tasks</p>
-                <p style={styles.statValue}>{tasks.length}</p>
+                <p style={styles.statLabel}>Study points earned</p>
+                <p style={styles.statValue}>⭐ {dailyPlan.score}</p>
               </div>
               <div style={styles.statCard}>
-                <p style={styles.statLabel}>Completed</p>
-                <p style={styles.statValue}>{tasks.filter(t => t.status === 'Complete').length}</p>
+                <p style={styles.statLabel}>Study sessions completed</p>
+                <p style={styles.statValue}>{dailyPlan.totalCompleted}</p>
               </div>
               <div style={styles.statCard}>
-                <p style={styles.statLabel}>Dropped</p>
-                <p style={styles.statValue}>{tasks.filter(t => t.status === 'Dropped').length}</p>
+                <p style={styles.statLabel}>Today’s progress</p>
+                <p style={styles.statValue}>{dailyPlan.tasks.filter((task) => task.status === 'Complete').length}/{dailyPlan.tasks.length}</p>
               </div>
             </div>
 
             <div style={styles.taskSection}>
-              <h3>Add Personal Task</h3>
-              <form onSubmit={addTask} style={styles.taskForm}>
-                <input type="text" placeholder="Task Name..." style={styles.input} value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} required />
-                <input type="date" style={styles.input} value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)} />
-                <button type="submit" style={styles.button}>+ Add Task</button>
+              <h3 style={{ marginTop: 0 }}>Your study goals</h3>
+              {studyGoals.length > 0 && <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+                {studyGoals.map((goal) => <span key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
+                  🎯 {goal.title} · target {new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}
+                </span>)}
+              </div>}
+              <form onSubmit={createStudyGoal} style={{ ...styles.taskForm, marginTop: '1rem' }}>
+                <input type="text" placeholder="What are you preparing for? (e.g. Biology exam)" style={styles.input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required />
+                <input type="date" aria-label="Exam or target date" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} required />
+                <input type="text" placeholder="Subjects or topics, separated by commas (optional)" style={styles.input} value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} />
+                <select aria-label="Daily study time" style={styles.actionSelect} value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}>
+                  <option value="30">30 minutes a day</option><option value="60">1 hour a day</option><option value="90">1.5 hours a day</option><option value="120">2 hours a day</option><option value="180">3 hours a day</option>
+                </select>
+                <button type="submit" style={styles.button} disabled={goalSaving}>{goalSaving ? 'Saving…' : '+ Create study goal'}</button>
               </form>
+              {goalError && <p style={{ color: '#fca5a5', marginTop: 0 }}>{goalError}</p>}
+            </div>
 
-              <h3 style={{ marginTop: '2rem', marginBottom: '1rem' }}>Your Tasks</h3>
+            <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
+              <h3 style={{ marginTop: 0 }}>Today’s study plan</h3>
+              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>Finish a session to earn 10 points. You’re making progress, one step at a time.</p>
               <div style={styles.taskList}>
-                {tasks.length === 0 ? (
-                  <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>No tasks added yet!</p>
+                {dailyPlan.tasks.length === 0 ? (
+                  <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Create a study goal above and we’ll build your first daily plan.'}</p>
                 ) : (
-                  tasks.map((task) => (
-                    <div key={task.id} style={styles.taskItem}>
-                      <div>
-                        <strong>{task.title}</strong>
-                        <p style={styles.taskSubtext}>Due: {task.dueDate}</p>
+                  dailyPlan.tasks.map((task) => (
+                    <div key={task.id} style={{ ...styles.taskItem, background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem' }}>
+                        <span style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
+                        <div><strong>{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <span style={{ ...styles.statusBadge, backgroundColor: task.status === 'Complete' ? '#059669' : task.status === 'Dropped' ? '#DC2626' : '#D97706' }}>
-                          {task.status}
-                        </span>
-                        <select style={styles.actionSelect} value={task.status} onChange={(e) => updateTaskStatus(task.id, e.target.value)}>
-                          <option value="Ongoing">Ongoing</option>
-                          <option value="Complete">Complete</option>
-                          <option value="Dropped">Dropped</option>
-                        </select>
-                      </div>
+                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points</span> : (
+                        <button type="button" onClick={() => updateTaskStatus(task.id, 'Complete')} style={styles.button}>Mark complete · +{task.points} ⭐</button>
+                      )}
                     </div>
                   ))
                 )}
+              </div>
+            </div>
+
+            <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
+              <h3 style={{ marginTop: 0 }}>Personal tasks</h3>
+              <form onSubmit={addTask} style={styles.taskForm}>
+                <input type="text" placeholder="Add a one-off task..." style={styles.input} value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} required />
+                <input type="date" aria-label="Task due date" style={styles.input} value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)} />
+                <button type="submit" style={styles.button}>+ Add task</button>
+              </form>
+              <div style={styles.taskList}>
+                {tasks.filter((task) => !task.goalId).map((task) => (
+                  <div key={task.id} style={styles.taskItem}>
+                    <div><strong>{task.title}</strong><p style={styles.taskSubtext}>Due: {task.dueDate}</p></div>
+                    <select aria-label={`Status for ${task.title}`} style={styles.actionSelect} value={task.status} onChange={(e) => updateTaskStatus(task.id, e.target.value)}>
+                      <option value="Ongoing">Ongoing</option><option value="Complete">Complete</option><option value="Dropped">Dropped</option>
+                    </select>
+                  </div>
+                ))}
               </div>
             </div>
           </>
