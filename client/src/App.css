@@ -316,8 +316,8 @@ button, input, select { font: inherit; }
 .profile-post-count strong { color: #eeeaff; }
 .profile-post-heading { margin: .4rem .2rem 0; }
 .profile-post-heading h3 { margin: .1rem 0; color: #f5f2ff; }
-.profile-edit-backdrop { z-index: 25; }
-.profile-edit-card { width: min(100%, 520px); max-height: min(90vh, 760px); overflow: auto; padding: 1.4rem; border: 1px solid rgba(178,169,231,.24); border-radius: 22px; background: #222239; box-shadow: 0 24px 80px rgba(0,0,0,.5); }
+.profile-edit-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; align-items: center; justify-content: center; padding: 1rem; background: rgba(8,9,20,.76); backdrop-filter: blur(7px); }
+.profile-edit-card { width: min(100%, 520px); max-height: min(90vh, 760px); max-height: min(90dvh, 760px); overflow: auto; padding: 1.4rem; border: 1px solid rgba(178,169,231,.24); border-radius: 22px; background: #222239; box-shadow: 0 24px 80px rgba(0,0,0,.5); }
 .profile-edit-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1rem; }
 .profile-edit-heading h2 { margin: .2rem 0 0; color: #f5f2ff; }
 .profile-edit-form { display: flex; flex-direction: column; gap: 1rem; }
