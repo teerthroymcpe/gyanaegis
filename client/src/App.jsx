@@ -80,6 +80,12 @@ function App() {
   const [messages, setMessages] = useState([]);
   const [newMessageText, setNewMessageText] = useState('');
   const chatThreadRef = useRef(null);
+  const [posts, setPosts] = useState([]);
+  const [postText, setPostText] = useState('');
+  const [postError, setPostError] = useState('');
+  const [postsLoadError, setPostsLoadError] = useState('');
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [postSubmitting, setPostSubmitting] = useState(false);
 
   const [teamTasks, setTeamTasks] = useState([]);
   const [newTeamTaskTitle, setNewTeamTaskTitle] = useState('');
@@ -129,6 +135,7 @@ function App() {
       fetchDailyPlan();
       fetchFriendships();
       fetchTeamTasks();
+      fetchPosts();
     }
   }, [currentUser]);
 
@@ -145,6 +152,12 @@ function App() {
     }
     return () => clearInterval(interval);
   }, [currentUser, selectedFriend]);
+
+  useEffect(() => {
+    if (!currentUser || activeTab !== 'posts') return undefined;
+    const interval = setInterval(fetchPosts, 15000);
+    return () => clearInterval(interval);
+  }, [currentUser, activeTab]);
 
   const newestMessageId = messages.length ? (messages[messages.length - 1]._id || messages[messages.length - 1].id) : '';
   useEffect(() => {
@@ -298,6 +311,9 @@ function App() {
     setTasks([]);
     setFriendships([]);
     setTeamTasks([]);
+    setPosts([]);
+    setPostText('');
+    setPostError('');
     setActiveTab('dashboard');
   };
 
@@ -309,6 +325,32 @@ function App() {
     } catch (err) {
       console.error(err);
     }
+  };
+
+  const fetchPosts = async () => {
+    setPostsLoading(true);
+    setPostsLoadError('');
+    try {
+      const res = await api.get('/posts');
+      setPosts(res.data);
+    } catch (err) {
+      setPostsLoadError(err.response?.data?.error || 'Could not load community posts.');
+    } finally { setPostsLoading(false); }
+  };
+
+  const publishPost = async (e) => {
+    e.preventDefault();
+    const text = postText.trim();
+    if (!text || postSubmitting) return;
+    setPostError('');
+    setPostSubmitting(true);
+    try {
+      const res = await api.post('/posts', { text });
+      setPosts((items) => [res.data, ...items].slice(0, 100));
+      setPostText('');
+    } catch (err) {
+      setPostError(err.response?.data?.error || 'Could not publish your post.');
+    } finally { setPostSubmitting(false); }
   };
 
   const localDate = () => {
@@ -719,6 +761,7 @@ function App() {
 
       <nav className="app-nav" style={styles.navBar}>
         <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📋 <span>Tasks</span></button>
+        <button className={`nav-pill ${activeTab === 'posts' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'posts' ? styles.activeTab : {}) }} onClick={() => setActiveTab('posts')}>✍️ <span>Posts</span></button>
         <button className={`nav-pill ${activeTab === 'friends' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}>💬 <span>Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</span></button>
       </nav>
 
@@ -818,6 +861,22 @@ function App() {
             </div>
           </>
         )}
+
+        {activeTab === 'posts' && <section className="community-page">
+          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Share what’s on your mind ✨</h2><p>Celebrate a win, share a study tip, or cheer someone on. Your post is visible to everyone on Gyanaegis.</p></div><span className="community-hero-art" aria-hidden="true">🌈</span></div>
+          <form className="post-composer study-panel" onSubmit={publishPost}>
+            <div className="post-author-line"><span className="post-avatar post-avatar-you">{currentUser.username.slice(0, 1).toUpperCase()}</span><div><strong>{currentUser.username}</strong><small>Posting to everyone</small></div></div>
+            <textarea aria-label="Write a post" placeholder="What would you like to share with the community?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={4} />
+            <div className="post-compose-footer"><span className="post-visibility">🌍 Everyone can see this</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={!postText.trim() || postSubmitting}>{postSubmitting ? 'Posting…' : 'Share post'} <span>➤</span></button></div></div>
+          </form>
+          <div className="community-feed-heading"><div><span className="section-kicker">FROM YOUR COMMUNITY</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
+          <div className="community-feed" aria-live="polite">
+            {postsLoading && posts.length === 0 ? <div className="feed-empty"><span>⏳</span><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><span>⚠️</span><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><span>🌱</span><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
+              <span className={`post-avatar post-avatar-${index % 4}`}>{post.author.slice(0, 1).toUpperCase()}</span>
+              <div className="community-post-body"><header><div><strong>{post.author}</strong><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div><span className="post-public-badge">🌍 Public</span></header><p>{post.text}</p></div>
+            </article>)}
+          </div>
+        </section>}
 
         {activeTab === 'friends' && (
           <div className="social-page">

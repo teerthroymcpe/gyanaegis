@@ -128,6 +128,13 @@ const messageSchema = new mongoose.Schema({
 }, { timestamps: true });
 const Message = mongoose.model('Message', messageSchema);
 
+const postSchema = new mongoose.Schema({
+  authorId: { type: String, required: true, index: true },
+  authorName: { type: String, required: true, maxlength: 32 },
+  text: { type: String, required: true, trim: true, maxlength: 1000 }
+}, { timestamps: true });
+const Post = mongoose.model('Post', postSchema);
+
 const teamTaskSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true, maxlength: 200 },
   members: [{ type: String, index: true }],
@@ -481,6 +488,30 @@ app.post('/api/auth/password-reset/recovery-code', limitAuthAttempts, async (req
 });
 
 app.use('/api', authenticate);
+
+app.get('/api/posts', async (req, res) => {
+  try {
+    const posts = await Post.find().sort({ _id: -1 }).limit(100).lean();
+    return res.json(posts.map((post) => ({ id: post._id.toString(), author: post.authorName, text: post.text, createdAt: post.createdAt })));
+  } catch (error) {
+    reportFailure('Load community posts failed', error);
+    return res.status(500).json({ error: 'Could not load posts.' });
+  }
+});
+
+app.post('/api/posts', async (req, res) => {
+  try {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (!text || text.length > 1000) return res.status(400).json({ error: 'Write a post between 1 and 1000 characters.' });
+    const author = await User.findById(req.userId).select('displayUsername');
+    if (!author) return res.status(404).json({ error: 'Account not found.' });
+    const post = await Post.create({ authorId: req.userId, authorName: author.displayUsername, text });
+    return res.status(201).json({ id: post._id.toString(), author: post.authorName, text: post.text, createdAt: post.createdAt });
+  } catch (error) {
+    reportFailure('Create community post failed', error);
+    return res.status(500).json({ error: 'Could not publish your post.' });
+  }
+});
 
 app.get('/api/auth/me', async (req, res) => {
   try {
