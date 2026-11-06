@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import './App.css';
 
 const API_URL = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '');
 const api = axios.create({ baseURL: API_URL });
@@ -329,6 +330,13 @@ function App() {
 
   const formatTimer = (seconds) => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
 
+  const getTimerProgress = (task) => {
+    if (task.timerState === 'completed' || task.status === 'Complete') return 100;
+    if (task.timerState !== 'running' && task.timerState !== 'paused') return 0;
+    const duration = task.timerDurationSeconds || 1;
+    return Math.min(100, Math.round(((duration - getTaskSecondsLeft(task)) / duration) * 100));
+  };
+
   const getDaysRemaining = (date) => {
     if (!date) return null;
     const [year, month, day] = date.split('-').map(Number);
@@ -589,16 +597,18 @@ function App() {
 
   const acceptedFriends = friendships.filter(f => f.status === 'accepted');
   const pendingRequests = friendships.filter(f => f.status === 'pending' && f.receiverId === currentUser.id);
+  const completedStudyTasks = dailyPlan.tasks.filter((task) => task.status === 'Complete').length;
+  const studyProgress = dailyPlan.tasks.length ? Math.round((completedStudyTasks / dailyPlan.tasks.length) * 100) : 0;
 
   return (
-    <div style={styles.container}>
-      <header style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div style={{ fontSize: '1.8rem' }}>🎓</div>
+    <div className="app-shell" style={styles.container}>
+      <header className="app-topbar" style={styles.header}>
+        <div className="app-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div className="brand-mark">🎓</div>
           <h1 style={styles.logoText}>Gyanaegis Academic Hub</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-          <span style={styles.userBadge}>👤 {currentUser.username}</span>
+          <span className="user-badge" style={styles.userBadge}>👤 {currentUser.username}</span>
           <button onClick={async () => {
             setRecoveryError('');
             setRecoveryMessage('');
@@ -658,84 +668,92 @@ function App() {
         </div>
       )}
 
-      <nav style={styles.navBar}>
-        <button style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📊 My Dashboard</button>
-        <button style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}>💬 Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</button>
-        <button style={{ ...styles.navTab, ...(activeTab === 'teams' ? styles.activeTab : {}) }} onClick={() => setActiveTab('teams')}>🤝 Team Tasks</button>
+      <nav className="app-nav" style={styles.navBar}>
+        <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📊 <span>My Dashboard</span></button>
+        <button className={`nav-pill ${activeTab === 'friends' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}>💬 <span>Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</span></button>
+        <button className={`nav-pill ${activeTab === 'teams' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'teams' ? styles.activeTab : {}) }} onClick={() => setActiveTab('teams')}>🤝 <span>Team Tasks</span></button>
       </nav>
 
-      <main style={styles.main}>
+      <main className="main-content" style={styles.main}>
         {activeTab === 'dashboard' && (
           <>
-            <div style={styles.welcomeCard}>
-              <h2>Your next step starts today, {currentUser.username} 🌱</h2>
-              <p>Small, steady study sessions add up. Set a goal and we’ll help you keep moving.</p>
+            <div className="dashboard-hero" style={styles.welcomeCard}>
+              <div className="hero-copy">
+                <span className="hero-eyebrow">YOUR PERSONAL STUDY SPACE</span>
+                <h2>Your next step starts today, {currentUser.username} 🌱</h2>
+                <p>Small, steady sessions add up. Set a goal and we’ll help you keep moving.</p>
+                <span className="hero-note">✨ One focused session at a time</span>
+              </div>
+              <div className="hero-art" aria-hidden="true"><span className="hero-orbit">✦</span><span className="hero-book">📚</span><span className="hero-spark">✧</span></div>
             </div>
 
-            <div style={styles.statsGrid}>
-              <div style={styles.statCard}>
+            <div className="dashboard-stats" style={styles.statsGrid}>
+              <div className="metric-card metric-points" style={styles.statCard}>
+                <div className="metric-icon">⭐</div><div>
                 <p style={styles.statLabel}>Study points earned</p>
-                <p style={styles.statValue}>⭐ {dailyPlan.score}</p>
+                <p style={styles.statValue}>{dailyPlan.score}</p></div>
               </div>
-              <div style={styles.statCard}>
+              <div className="metric-card metric-sessions" style={styles.statCard}>
+                <div className="metric-icon">📖</div><div>
                 <p style={styles.statLabel}>Study sessions completed</p>
-                <p style={styles.statValue}>{dailyPlan.totalCompleted}</p>
+                <p style={styles.statValue}>{dailyPlan.totalCompleted}</p></div>
               </div>
-              <div style={styles.statCard}>
+              <div className="metric-card metric-progress" style={styles.statCard}>
+                <div className="metric-icon">🌈</div><div>
                 <p style={styles.statLabel}>Today’s progress</p>
-                <p style={styles.statValue}>{dailyPlan.tasks.filter((task) => task.status === 'Complete').length}/{dailyPlan.tasks.length}</p>
+                <p style={styles.statValue}>{completedStudyTasks}<span className="metric-total"> / {dailyPlan.tasks.length}</span></p></div>
               </div>
             </div>
 
-            <div style={styles.taskSection}>
-              <h3 style={{ marginTop: 0 }}>Your study goals</h3>
-              {studyGoals.length > 0 && <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
-                {studyGoals.map((goal) => <span key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
+            <div className="study-panel goals-panel" style={styles.taskSection}>
+              <div className="section-heading"><div><span className="section-kicker">MAKE IT YOURS</span><h3>Your study goals</h3></div><span className="heading-sticker">🎯</span></div>
+              {studyGoals.length > 0 && <div className="goal-chip-list" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+                {studyGoals.map((goal) => <span className="goal-chip" key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
                   🎯 {goal.title} · {goal.targetDate ? `📅 ${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : '📅 No deadline set'}
                 </span>)}
               </div>}
-              <form onSubmit={createStudyGoal} style={{ ...styles.taskForm, marginTop: '1rem' }}>
-                <input type="text" placeholder="What are you preparing for? (e.g. Biology exam)" style={styles.input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required />
-                <input type="date" aria-label="Target date (optional)" title="Target date (optional)" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} />
-                <input type="text" placeholder="Subjects or topics, separated by commas (optional)" style={styles.input} value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} />
-                <select aria-label="Daily study time" style={styles.actionSelect} value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}>
+              <form className="goal-form" onSubmit={createStudyGoal} style={{ ...styles.taskForm, marginTop: '1rem' }}>
+                <input className="colorful-input goal-title-input" type="text" placeholder="What are you preparing for? (e.g. Biology exam)" style={styles.input} value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required />
+                <input className="colorful-input" type="date" aria-label="Target date (optional)" title="Target date (optional)" style={styles.input} value={goalTargetDate} min={localDate()} onChange={(e) => setGoalTargetDate(e.target.value)} />
+                <input className="colorful-input goal-subject-input" type="text" placeholder="Subjects or topics, separated by commas (optional)" style={styles.input} value={goalSubjects} onChange={(e) => setGoalSubjects(e.target.value)} />
+                <select className="colorful-input" aria-label="Daily study time" style={styles.actionSelect} value={goalMinutes} onChange={(e) => setGoalMinutes(e.target.value)}>
                   <option value="30">30 minutes a day</option><option value="60">1 hour a day</option><option value="90">1.5 hours a day</option><option value="120">2 hours a day</option><option value="180">3 hours a day</option>
                 </select>
-                <button type="submit" style={styles.button} disabled={goalSaving}>{goalSaving ? 'Saving…' : '+ Create study goal'}</button>
+                <button className="colorful-button create-goal-button" type="submit" style={styles.button} disabled={goalSaving}>{goalSaving ? 'Saving…' : '+ Create study goal'}</button>
               </form>
-              {goalError && <p style={{ color: '#fca5a5', marginTop: 0 }}>{goalError}</p>}
+              {goalError && <p className="form-error" style={{ color: '#fca5a5', marginTop: 0 }}>{goalError}</p>}
             </div>
 
-            <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <h3 style={{ marginTop: 0 }}>Today’s study plan</h3>
-              <p style={{ color: '#94a3b8', marginTop: '-0.25rem' }}>The countdown stays visible while you study. Pause whenever you need; 10 points are added automatically when the full time is up.</p>
+            <div className="study-panel plan-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
+              <div className="section-heading plan-heading"><div><span className="section-kicker">YOUR DAILY RHYTHM</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">☀️ Today</span></div>
+              <div className="daily-progress-wrap"><div className="daily-progress-label"><span>Today’s progress</span><strong>{studyProgress}%</strong></div><div className="daily-progress-track"><div className="daily-progress-fill" style={{ width: `${studyProgress}%` }} /></div></div>
               {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
-              <div style={styles.taskList}>
+              <div className="study-session-list" style={styles.taskList}>
                 {dailyPlan.tasks.length === 0 ? (
                   <p style={{ color: '#94a3b8', textAlign: 'center', margin: '1.5rem 0' }}>{studyGoals.length ? 'Your next daily plan will be ready on your study date.' : 'Create a study goal above and we’ll build your first daily plan.'}</p>
                 ) : (
                   dailyPlan.tasks.map((task) => (
-                    <div key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 260px' }}>
-                        <span style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
-                        <div><strong>{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
+                    <div className={`study-session-card ${task.status === 'Complete' ? 'session-complete' : task.timerState === 'running' ? 'session-running' : ''}`} key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
+                      <div className="session-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 260px' }}>
+                        <span className="session-emoji" style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
+                        <div><strong className="session-title">{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
-                      {task.status === 'Complete' ? <span style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                          <div style={{ textAlign: 'right', minWidth: '116px' }}>
-                            <span style={{ display: 'block', color: '#94a3b8', fontSize: '0.72rem', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                              {task.timerState === 'running' ? 'Time remaining' : task.timerState === 'paused' ? 'Paused · remaining' : 'Session length'}
-                            </span>
-                            <strong aria-live="off" style={{ fontVariantNumeric: 'tabular-nums', fontSize: '1.35rem', lineHeight: 1.4, color: task.timerState === 'paused' ? '#fbbf24' : '#7dd3fc' }}>
-                              {formatTimer(getTaskSecondsLeft(task))}
-                            </strong>
+                      {task.status === 'Complete' ? <span className="earned-points" style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : (
+                        <div className="session-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <div className="timer-stack">
+                            <div className={`timer-face ${task.timerState === 'paused' ? 'timer-is-paused' : ''}`} style={{ '--timer-progress': `${getTimerProgress(task)}%` }}>
+                              <div className="timer-face-inner">
+                                <span className="timer-label">{task.timerState === 'running' ? 'LEFT' : task.timerState === 'paused' ? 'PAUSED' : 'READY'}</span>
+                                <strong className="timer-digits" aria-live="off">{formatTimer(getTaskSecondsLeft(task))}</strong>
+                              </div>
+                            </div>
                           </div>
                           {task.timerState === 'running' ? (
-                            <button type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Pause</button>
+                            <button className="timer-action timer-pause" type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Ⅱ Pause</button>
                           ) : task.timerState === 'paused' ? (
-                            <button type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>Resume</button>
+                            <button className="timer-action timer-resume" type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>▶ Resume</button>
                           ) : (
-                            <button type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>Start timer</button>
+                            <button className="timer-action timer-start" type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>▶ Start session</button>
                           )}
                         </div>
                       )}
@@ -745,9 +763,9 @@ function App() {
               </div>
             </div>
 
-            <div style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <h3 style={{ marginTop: 0 }}>Personal tasks</h3>
-              <form onSubmit={addTask} style={styles.taskForm}>
+            <div className="study-panel personal-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
+              <div className="section-heading"><div><span className="section-kicker">OTHER THINGS TO DO</span><h3>Personal tasks</h3></div><span className="heading-sticker">📝</span></div>
+              <form className="goal-form personal-task-form" onSubmit={addTask} style={styles.taskForm}>
                 <input type="text" placeholder="Add a one-off task..." style={styles.input} value={newTaskTitle} onChange={(e) => setNewTaskTitle(e.target.value)} required />
                 <input type="date" aria-label="Task due date" style={styles.input} value={newTaskDueDate} onChange={(e) => setNewTaskDueDate(e.target.value)} />
                 <button type="submit" style={styles.button}>+ Add task</button>
