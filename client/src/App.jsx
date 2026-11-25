@@ -221,16 +221,16 @@ function App() {
 
   if (!currentUser) {
     return (
-      <div style={styles.loginContainer}>
-        <div style={styles.loginCard}>
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-            <div style={styles.logoIcon}>G</div>
-          </div>
-          <h2 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>Gyanaegis Cloud Hub</h2>
-          <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
-            {authMode === 'signup' ? 'Create a cloud student account' : authMode === 'forgot' ? 'Request a secure password reset link' : authMode === 'reset' ? 'Choose a new password' : 'Sign in to your portal'}
-          </p>
-
+      <div className="auth-layout" style={styles.loginContainer}>
+        <section className="auth-intro">
+          <div className="auth-brand"><span>G</span></div>
+          <div className="auth-copy"><h2>Gyanaegis Cloud Hub</h2><p>{authMode === 'signup' ? 'Create a cloud student account' : authMode === 'forgot' ? 'Request a secure password reset link' : authMode === 'reset' ? 'Choose a new password' : 'Sign in to your portal'}</p></div>
+          <section className="study-preview" aria-label="Study timer preview">
+            <div className="study-preview-heading"><span>Daily study plan</span><span>Study timer</span></div>
+            <div className="study-preview-task"><span>Current session</span><strong>Focused study</strong><div className="study-preview-time">40:00</div><p>Complete a timed session to earn study points.</p></div>
+          </section>
+        </section>
+        <div className="loginCard" style={styles.loginCard}>
           {authError && <div style={styles.errorAlert}>{authError}</div>}
           {authMessage && <div style={styles.successAlert}>{authMessage}</div>}
 
@@ -283,11 +283,11 @@ function App() {
             </form>
           )}
 
-          <div style={{ marginTop: '1.5rem', fontSize: '0.9rem', color: '#94a3b8' }}>
+          <div style={{ marginTop: '1.5rem', fontSize: '1rem', color: '#94a3b8' }}>
             {authMode === 'signup' ? (
               <span>Already have an account? <button type="button" onClick={() => { setAuthMode('signin'); setAuthError(''); setAuthMessage(''); }} style={styles.switchBtn}>Sign In</button></span>
             ) : authMode === 'signin' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                 <span><button type="button" onClick={() => { setAuthMode('forgot'); setAuthError(''); setAuthMessage(''); }} style={styles.switchBtn}>Forgot password?</button></span>
                 <span>Don't have an account? <button type="button" onClick={() => { setAuthMode('signup'); setAuthError(''); setAuthMessage(''); }} style={styles.switchBtn}>Sign Up</button></span>
               </div>
@@ -332,7 +332,7 @@ function App() {
             {recoveryError && <div style={styles.errorAlert}>{recoveryError}</div>}
             {recoveryMessage && <div style={styles.successAlert}>{recoveryMessage}</div>}
             {recoveryCodeDisplay ? (
-              <div style={{ marginBottom: '1.25rem' }}>
+              <div style={{ marginBottom: '1rem' }}>
                 <p style={{ color: '#fecaca', fontWeight: 'bold' }}>Save this one-time code somewhere private. It will not be shown again.</p>
                 <input aria-label="One-time recovery code" readOnly value={recoveryCodeDisplay} onFocus={(e) => e.target.select()} style={{ ...styles.input, width: '100%', boxSizing: 'border-box', fontFamily: 'monospace', letterSpacing: '0.04em' }} />
                 <button type="button" onClick={async () => {
@@ -350,7 +350,7 @@ function App() {
               </>
             )}
             {emailRecoveryEnabled ? (
-              <details style={{ marginTop: '1.25rem', color: '#cbd5e1' }}>
+              <details style={{ marginTop: '1rem', color: '#cbd5e1' }}>
                 <summary style={{ cursor: 'pointer' }}>Optional: set up email recovery</summary>
                 <p>{currentUser.recoveryEmailVerified ? `Verified email: ${currentUser.recoveryEmail}` : currentUser.recoveryEmail ? `${currentUser.recoveryEmail} is waiting for verification.` : 'Email must be verified before it can reset your password.'}</p>
                 {recoveryError && <div style={styles.errorAlert}>{recoveryError}</div>}
@@ -370,7 +370,7 @@ function App() {
 
       {taskComposerOpen && <div className="modalBackdrop task-composer-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setTaskComposerOpen(false); }}>
         <section className="task-composer" role="dialog" aria-modal="true" aria-labelledby="taskComposerTitle">
-          <div className="task-composer-heading"><div><span className="section-kicker">ADD SOMETHING TO YOUR LIST</span><h2 id="taskComposerTitle">Create a task</h2></div><button className="composer-close" type="button" aria-label="Close" onClick={() => setTaskComposerOpen(false)}>×</button></div>
+          <div className="task-composer-heading"><div><span className="section-kicker">Add something to your list</span><h2 id="taskComposerTitle">Create a task</h2></div><button className="composer-close" type="button" aria-label="Close" onClick={() => setTaskComposerOpen(false)}>×</button></div>
           <div className="composer-types" role="group" aria-label="Task type">
             {[['study', 'Study goal'], ['personal', 'Personal'], ['shared', 'Shared']].map(([type, label]) => <button className={`composer-type ${composerType === type ? 'type-selected' : ''}`} type="button" aria-pressed={composerType === type} key={type} onClick={() => { setComposerType(type); setTaskFormError(''); setGoalError(''); }}>{label}</button>)}
           </div>
@@ -398,7 +398,7 @@ function App() {
 
       {profileEditOpen && <div className="modalBackdrop profile-edit-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setProfileEditOpen(false); }}>
         <section className="profile-edit-card" role="dialog" aria-modal="true" aria-labelledby="profileEditTitle">
-          <div className="profile-edit-heading"><div><span className="section-kicker">MAKE IT YOURS</span><h2 id="profileEditTitle">Edit profile</h2></div><button type="button" className="composer-close" aria-label="Close" onClick={() => setProfileEditOpen(false)}>×</button></div>
+          <div className="profile-edit-heading"><div><span className="section-kicker">Make it yours</span><h2 id="profileEditTitle">Edit profile</h2></div><button type="button" className="composer-close" aria-label="Close" onClick={() => setProfileEditOpen(false)}>×</button></div>
           <form className="profile-edit-form" onSubmit={saveProfile}>
             <label className="profile-photo-picker"><ProfileAvatar name={profileDraftName} image={profileDraftAvatar} className="profile-edit-avatar" /><span><strong>Change profile photo</strong><small>Square photo, centered automatically</small><input type="file" accept="image/*" onChange={(event) => selectProfilePhoto(event.target.files?.[0])} /></span></label>
             <label>Display name<input className="colorful-input" value={profileDraftName} onChange={(event) => setProfileDraftName(event.target.value.slice(0, 50))} maxLength={50} required /></label>
@@ -420,8 +420,8 @@ function App() {
         {activeTab === 'dashboard' && (
           <>
             <div className="tasks-page-heading">
-              <div><span className="section-kicker">YOUR PERSONAL WORKSPACE</span><h2>Tasks</h2><p>Study, personal, and shared tasks in one place.</p></div>
-              <button className="colorful-button add-task-top" type="button" style={styles.button} onClick={() => { setTaskComposerOpen(true); setTaskFormError(''); setGoalError(''); }}>＋ Add task</button>
+              <div><span className="section-kicker">Your personal workspace</span><h2>Tasks</h2><p>Study, personal, and shared tasks in one place.</p></div>
+              <button className="colorful-button add-task-top" type="button" style={styles.button} onClick={() => { setTaskComposerOpen(true); setTaskFormError(''); setGoalError(''); }}>Add task</button>
             </div>
 
             <div className="dashboard-stats" style={styles.statsGrid}>
@@ -437,16 +437,16 @@ function App() {
             </div>
 
             <div className="study-panel goals-panel" style={styles.taskSection}>
-              <div className="section-heading"><div><span className="section-kicker">STUDY GOALS</span><h3>Your focus</h3></div></div>
-              {studyGoals.length > 0 ? <div className="goal-chip-list" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
-                {studyGoals.map((goal) => <span className="goal-chip" key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
+              <div className="section-heading"><div><span className="section-kicker">Study goals</span><h3>Your focus</h3></div></div>
+              {studyGoals.length > 0 ? <div className="goal-chip-list" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+                {studyGoals.map((goal) => <span className="goal-chip" key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.5rem 0.75rem' }}>
                   {goal.title} · {goal.targetDate ? `${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : 'No deadline set'}
                 </span>)}
               </div> : <p className="focus-empty">No study goal yet. Choose <strong>Add task → Study goal</strong> to create one.</p>}
             </div>
 
             <div className="study-panel plan-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <div className="section-heading plan-heading"><div><span className="section-kicker">DAILY STUDY TASKS</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">Today</span></div>
+              <div className="section-heading plan-heading"><div><span className="section-kicker">Daily study tasks</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">Today</span></div>
               <div className="daily-progress-wrap"><div className="daily-progress-label"><span>Today’s progress</span><strong>{studyProgress}%</strong></div><div className="daily-progress-track"><div className="daily-progress-fill" style={{ width: `${studyProgress}%` }} /></div></div>
               {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
               <div className="study-session-list" style={styles.taskList}>
@@ -455,16 +455,16 @@ function App() {
                 ) : (
                   dailyPlan.tasks.map((task) => (
                     <div className={`study-session-card ${task.status === 'Complete' ? 'session-complete' : task.timerState === 'running' ? 'session-running' : ''}`} key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
-                      <div className="session-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 260px' }}>
+                      <div className="session-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: '1 1 260px' }}>
                         <span className="session-tag">{task.status === 'Complete' ? 'Done' : 'Study'}</span>
-                        <div><strong className="session-title">{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
+                        <div><strong className="session-title">{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal.' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
                       {task.status === 'Complete' ? <span className="earned-points" style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned</span> : (
                         <div className="session-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <div className="timer-stack">
                             <div className={`timer-face ${task.timerState === 'paused' ? 'timer-is-paused' : ''}`} style={{ '--timer-progress': `${getTimerProgress(task)}%` }}>
                               <div className="timer-face-inner">
-                                <span className="timer-label">{task.timerState === 'running' ? 'LEFT' : task.timerState === 'paused' ? 'PAUSED' : 'READY'}</span>
+                                <span className="timer-label">{task.timerState === 'running' ? 'Left' : task.timerState === 'paused' ? 'Paused' : 'Ready'}</span>
                                 <strong className="timer-digits" aria-live="off">{formatTimer(getTaskSecondsLeft(task))}</strong>
                               </div>
                             </div>
@@ -485,7 +485,7 @@ function App() {
             </div>
 
             <div className="study-panel personal-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <div className="section-heading"><div><span className="section-kicker">YOUR OWN TASKS</span><h3>Personal tasks</h3></div><span className="section-count">{personalTasks.length}</span></div>
+              <div className="section-heading"><div><span className="section-kicker">Your own tasks</span><h3>Personal tasks</h3></div><span className="section-count">{personalTasks.length}</span></div>
               <div style={styles.taskList}>
                 {personalTasks.length === 0 ? <p className="focus-empty">No personal tasks yet. Use <strong>Add task</strong> to make one.</p> : personalTasks.map((task) => (
                   <div key={task.id} style={styles.taskItem}>
@@ -499,10 +499,10 @@ function App() {
             </div>
 
             <div className="study-panel team-list-panel" style={{ marginTop: '1rem' }}>
-              <div className="section-heading"><div><span className="section-kicker">WITH YOUR FRIENDS</span><h3>Shared tasks</h3></div><span className="section-count">{teamTasks.length}</span></div>
+              <div className="section-heading"><div><span className="section-kicker">With your friends</span><h3>Shared tasks</h3></div><span className="section-count">{teamTasks.length}</span></div>
               {teamTasks.length === 0 ? <p className="focus-empty">No shared tasks yet. Use <strong>Add task → Shared</strong> to invite a friend.</p> : <div className="shared-task-list">
                 {teamTasks.map((task) => <article className={`shared-task-card task-${task.status.toLowerCase()}`} key={task.id}>
-                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>With {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> Due {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
+                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'Win celebrated' : task.status === 'Dropped' ? 'Saved for later' : 'In progress'}</span><h4>{task.title}</h4><p>With {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> Due {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
                   <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? 'Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
                     <option value="Ongoing">In progress</option><option value="Complete">Complete</option><option value="Dropped">Save for later</option>
                   </select></div>
@@ -513,14 +513,14 @@ function App() {
         )}
 
         {activeTab === 'posts' && <section className="community-page">
-          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Your study circle</h2><p>Share a win, ask for advice, and cheer each other on.</p></div></div>
+          <div className="community-hero"><div><span className="hero-eyebrow">The Gyanaegis community</span><h2>Your study circle</h2><p>Share a win, ask for advice, and cheer each other on.</p></div></div>
           <form className="post-composer study-panel" onSubmit={publishPost}>
             <div className="post-author-line"><ProfileAvatar name={currentUser.displayName || currentUser.username} image={currentUser.avatarData} className="post-avatar post-avatar-you" onClick={() => openProfile(currentUser.username)} /><div><strong>{currentUser.displayName || currentUser.username}</strong><small>Share with your community</small></div></div>
             <textarea aria-label="Write a post" placeholder="What’s happening with your studies?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={3} />
             {postImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={postImage} alt="Selected post" /><button type="button" className="remove-post-image" onClick={() => setPostImage('')}>Remove photo</button></div>}
             <div className="post-compose-footer"><label className="post-photo-button">Add photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setPostImage); event.target.value = ''; }} /></label><span className="post-visibility">Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={(!postText.trim() && !postImage) || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'}</button></div></div>
           </form>
-          <div className="community-feed-heading"><div><span className="section-kicker">YOUR TIMELINE</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
+          <div className="community-feed-heading"><div><span className="section-kicker">Your timeline</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
           <div className="community-feed" aria-live="polite">
             {postError && <p className="post-error feed-action-error" role="alert">{postError}</p>}
             {postsLoading && posts.length === 0 ? <div className="feed-empty"><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
@@ -536,7 +536,7 @@ function App() {
           <button className="profile-back" type="button" onClick={() => setActiveTab(profileReturnTab)}>← Back to {profileReturnTab === 'friends' ? 'friends' : 'posts'}</button>
           {profileLoading ? <div className="feed-empty"><p>Loading profile…</p></div> : profileError && !profileData ? <div className="feed-empty"><p>{profileError}</p></div> : profileData && <>
             <section className="profile-card study-panel"><div className="profile-cover" /><div className="profile-card-content"><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="profile-page-avatar" /><div className="profile-card-actions">{profileData.username === currentUser.username.toLowerCase() && <button type="button" className="profile-edit-button" onClick={startProfileEdit}>Edit profile</button>}</div><h2>{profileData.displayName}</h2><p className="profile-handle">@{profileData.username}</p>{profileData.bio && <p className="profile-bio">{profileData.bio}</p>}<p className="profile-joined">Studying with Gyanaegis since {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'recently'}</p><span className="profile-post-count"><strong>{profileData.postCount}</strong> {profileData.postCount === 1 ? 'post' : 'posts'}</span></div></section>
-            <div className="profile-post-heading"><span className="section-kicker">THEIR TIMELINE</span><h3>Posts</h3></div>
+            <div className="profile-post-heading"><span className="section-kicker">Their timeline</span><h3>Posts</h3></div>
             <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.editedAt && <span className="post-edited-label">Edited</span>}</header>{post.text && <p>{post.text}</p>}{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}</div></article>) : <div className="feed-empty"><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
           </>}
         </section>}
@@ -544,11 +544,11 @@ function App() {
         {activeTab === 'friends' && (
           <div className="social-page">
             <div className="social-hero">
-              <div><span className="hero-eyebrow">YOUR PEOPLE, YOUR PROGRESS</span><h2>Study feels better together</h2><p>Catch up with friends, share a little encouragement, and keep each other moving.</p></div>
+              <div><span className="hero-eyebrow">Your people, your progress</span><h2>Study feels better together</h2><p>Catch up with friends, share a little encouragement, and keep each other moving.</p></div>
             </div>
             <div className="social-layout">
               <aside className="friend-sidebar study-panel">
-                <div className="section-heading"><div><span className="section-kicker">YOUR CIRCLE</span><h3>Friends <span className="count-bubble">{acceptedFriends.length}</span></h3></div></div>
+                <div className="section-heading"><div><span className="section-kicker">Your circle</span><h3>Friends <span className="count-bubble">{acceptedFriends.length}</span></h3></div></div>
                 <form className="friend-add-form" onSubmit={sendFriendRequest}>
                   <label htmlFor="friend-username">Add a study buddy</label>
                   <div className="friend-add-row"><input id="friend-username" type="text" placeholder="Friend’s username" style={styles.input} value={friendUsernameInput} onChange={(e) => setFriendUsernameInput(e.target.value)} required /><button className="colorful-button" type="submit" style={styles.button} aria-label="Send friend request">+</button></div>
@@ -557,11 +557,11 @@ function App() {
                 {friendSuccess && <p className="social-alert social-alert-success" role="status">{friendSuccess}</p>}
 
                 {pendingRequests.length > 0 && <div className="request-section">
-                  <span className="sidebar-label">NEW REQUESTS <span>{pendingRequests.length}</span></span>
+                  <span className="sidebar-label">New requests <span>{pendingRequests.length}</span></span>
                   {pendingRequests.map((req) => <div className="request-card" key={req.id}><span className="friend-avatar avatar-coral">{req.senderUsername.slice(0, 1).toUpperCase()}</span><div className="request-copy"><strong>{req.senderUsername}</strong><small>wants to connect</small></div><button type="button" className="accept-button" disabled={acceptingRequestId === req.id} onClick={() => acceptFriendRequest(req.id)}>{acceptingRequestId === req.id ? 'Accepting…' : 'Accept'}</button></div>)}
                 </div>}
 
-                <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? 'Ready to chat' : ''}</span></div>
+                <div className="friend-list-heading"><span className="sidebar-label">Your friends</span><span className="online-note">{acceptedFriends.length ? 'Ready to chat' : ''}</span></div>
                 <div className="friend-list">
                   {acceptedFriends.length === 0 ? <div className="sidebar-empty"><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <div
                     className={`friend-row ${selectedFriend?.friendId === friend.friendId ? 'friend-selected' : ''}`}
@@ -578,7 +578,7 @@ function App() {
                 {selectedFriend ? <>
                   <div className="chat-header">
                     <ProfileAvatar name={selectedFriend.friendUsername} className="friend-avatar avatar-chat" onClick={() => openProfile(selectedFriend.friendUsername)} />
-                    <div className="chat-header-copy"><span className="section-kicker">YOUR STUDY BUDDY</span><h3>{selectedFriend.friendUsername}</h3></div>
+                    <div className="chat-header-copy"><span className="section-kicker">Your study buddy</span><h3>{selectedFriend.friendUsername}</h3></div>
                     <span className="chat-connected">Connected</span>
                   </div>
                   <div className="chat-thread" aria-live="polite" ref={chatThreadRef}>
@@ -595,7 +595,7 @@ function App() {
                     <input type="text" aria-label="Message" placeholder={`Write a kind note to ${selectedFriend.friendUsername}…`} style={styles.input} value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} required />
                     <button className="chat-send-button" type="submit" aria-label="Send message">Send</button>
                   </form>
-                </> : <div className="chat-placeholder"><span className="section-kicker">A LITTLE CONNECTION GOES A LONG WAY</span><h3>Choose a friend to start chatting</h3><p>Your conversations with study buddies will show up here.</p></div>}
+                </> : <div className="chat-placeholder"><span className="section-kicker">A little connection goes a long way</span><h3>Choose a friend to start chatting</h3><p>Your conversations with study buddies will show up here.</p></div>}
               </section>
             </div>
           </div>
