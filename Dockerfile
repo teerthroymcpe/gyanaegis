@@ -11,6 +11,7 @@ WORKDIR /app
 COPY server/package*.json ./server/
 RUN cd server && npm ci --omit=dev && npm cache clean --force
 COPY server/server.js ./server/server.js
+COPY server/api.js ./server/api.js
 COPY --from=client-build /app/client/dist ./client/dist
 EXPOSE 5002
 CMD ["node", "server/server.js"]
