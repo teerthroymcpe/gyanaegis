@@ -224,7 +224,7 @@ function App() {
       <div style={styles.loginContainer}>
         <div style={styles.loginCard}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
-            <div style={styles.logoIcon}>🎓</div>
+            <div style={styles.logoIcon}>G</div>
           </div>
           <h2 style={{ color: '#38bdf8', marginBottom: '0.5rem' }}>Gyanaegis Cloud Hub</h2>
           <p style={{ color: '#94a3b8', marginBottom: '1.5rem' }}>
@@ -304,7 +304,7 @@ function App() {
     <div className="app-shell" style={styles.container}>
       <header className="app-topbar" style={styles.header}>
         <div className="app-brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-          <div className="brand-mark">🎓</div>
+          <div className="brand-mark">G</div>
           <h1 style={styles.logoText}>Gyanaegis Academic Hub</h1>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
@@ -320,7 +320,7 @@ function App() {
               setCurrentUser(res.data.user);
               setRecoveryEmailInput(res.data.user.recoveryEmail || '');
             } catch {}
-          }} style={styles.accountBtn}>Recovery Options{currentUser.hasRecoveryCode ? ' ✓' : ''}</button>
+          }} style={styles.accountBtn}>Recovery Options{currentUser.hasRecoveryCode ? ' (ready)' : ''}</button>
           <button onClick={handleLogout} style={styles.logoutBtn}>Sign Out</button>
         </div>
       </header>
@@ -372,7 +372,7 @@ function App() {
         <section className="task-composer" role="dialog" aria-modal="true" aria-labelledby="taskComposerTitle">
           <div className="task-composer-heading"><div><span className="section-kicker">ADD SOMETHING TO YOUR LIST</span><h2 id="taskComposerTitle">Create a task</h2></div><button className="composer-close" type="button" aria-label="Close" onClick={() => setTaskComposerOpen(false)}>×</button></div>
           <div className="composer-types" role="group" aria-label="Task type">
-            {[['study', '🎯', 'Study goal'], ['personal', '📝', 'Personal'], ['shared', '🤝', 'Shared']].map(([type, icon, label]) => <button className={`composer-type ${composerType === type ? 'type-selected' : ''}`} type="button" aria-pressed={composerType === type} key={type} onClick={() => { setComposerType(type); setTaskFormError(''); setGoalError(''); }}><span>{icon}</span>{label}</button>)}
+            {[['study', 'Study goal'], ['personal', 'Personal'], ['shared', 'Shared']].map(([type, label]) => <button className={`composer-type ${composerType === type ? 'type-selected' : ''}`} type="button" aria-pressed={composerType === type} key={type} onClick={() => { setComposerType(type); setTaskFormError(''); setGoalError(''); }}>{label}</button>)}
           </div>
           {composerType === 'study' ? <form className="composer-form" onSubmit={createStudyGoal}>
             <label>What are you preparing for?<input className="colorful-input" type="text" placeholder="e.g. Biology exam" value={goalTitle} onChange={(e) => setGoalTitle(e.target.value)} maxLength={120} required /></label>
@@ -411,9 +411,9 @@ function App() {
       </div>}
 
       <nav className="app-nav" style={styles.navBar}>
-        <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}>📋 <span>Tasks</span></button>
-        <button className={`nav-pill ${activeTab === 'posts' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'posts' ? styles.activeTab : {}) }} onClick={() => setActiveTab('posts')}>✍️ <span>Posts</span></button>
-        <button className={`nav-pill ${activeTab === 'friends' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}>💬 <span>Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</span></button>
+        <button className={`nav-pill ${activeTab === 'dashboard' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'dashboard' ? styles.activeTab : {}) }} onClick={() => setActiveTab('dashboard')}><span>Tasks</span></button>
+        <button className={`nav-pill ${activeTab === 'posts' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'posts' ? styles.activeTab : {}) }} onClick={() => setActiveTab('posts')}><span>Posts</span></button>
+        <button className={`nav-pill ${activeTab === 'friends' ? 'is-active' : ''}`} style={{ ...styles.navTab, ...(activeTab === 'friends' ? styles.activeTab : {}) }} onClick={() => setActiveTab('friends')}><span>Friends & Chat {pendingRequests.length > 0 && `(${pendingRequests.length})`}</span></button>
       </nav>
 
       <main className="main-content" style={styles.main}>
@@ -426,13 +426,13 @@ function App() {
 
             <div className="dashboard-stats" style={styles.statsGrid}>
               <div className="metric-card metric-points" style={styles.statCard}>
-                <div className="metric-icon">⭐</div><div><p style={styles.statLabel}>Study points</p><p style={styles.statValue}>{dailyPlan.score}</p></div>
+                <div><p style={styles.statLabel}>Study points</p><p style={styles.statValue}>{dailyPlan.score}</p></div>
               </div>
               <div className="metric-card metric-sessions" style={styles.statCard}>
-                <div className="metric-icon">📋</div><div><p style={styles.statLabel}>All tasks</p><p style={styles.statValue}>{taskCount}</p></div>
+                <div><p style={styles.statLabel}>All tasks</p><p style={styles.statValue}>{taskCount}</p></div>
               </div>
               <div className="metric-card metric-progress" style={styles.statCard}>
-                <div className="metric-icon">✅</div><div><p style={styles.statLabel}>Completed tasks</p><p style={styles.statValue}>{completedTaskCount}</p></div>
+                <div><p style={styles.statLabel}>Completed tasks</p><p style={styles.statValue}>{completedTaskCount}</p></div>
               </div>
             </div>
 
@@ -440,13 +440,13 @@ function App() {
               <div className="section-heading"><div><span className="section-kicker">STUDY GOALS</span><h3>Your focus</h3></div></div>
               {studyGoals.length > 0 ? <div className="goal-chip-list" style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
                 {studyGoals.map((goal) => <span className="goal-chip" key={goal.id} style={{ ...styles.statusBadge, backgroundColor: '#1d4ed8', padding: '0.45rem 0.8rem' }}>
-                  🎯 {goal.title} · {goal.targetDate ? `📅 ${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : '📅 No deadline set'}
+                  {goal.title} · {goal.targetDate ? `${getDaysRemaining(goal.targetDate) === 0 ? 'Due today' : `${getDaysRemaining(goal.targetDate)} days left`} · ${new Date(`${goal.targetDate}T00:00:00`).toLocaleDateString()}` : 'No deadline set'}
                 </span>)}
               </div> : <p className="focus-empty">No study goal yet. Choose <strong>Add task → Study goal</strong> to create one.</p>}
             </div>
 
             <div className="study-panel plan-panel" style={{ ...styles.taskSection, marginTop: '1.5rem' }}>
-              <div className="section-heading plan-heading"><div><span className="section-kicker">DAILY STUDY TASKS</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">☀️ Today</span></div>
+              <div className="section-heading plan-heading"><div><span className="section-kicker">DAILY STUDY TASKS</span><h3>Today’s study plan</h3><p>Short, focused sessions are a win. Pause anytime; points arrive when the timer ends.</p></div><span className="plan-date-chip">Today</span></div>
               <div className="daily-progress-wrap"><div className="daily-progress-label"><span>Today’s progress</span><strong>{studyProgress}%</strong></div><div className="daily-progress-track"><div className="daily-progress-fill" style={{ width: `${studyProgress}%` }} /></div></div>
               {timerError && <p role="alert" style={{ color: '#fca5a5' }}>{timerError}</p>}
               <div className="study-session-list" style={styles.taskList}>
@@ -456,10 +456,10 @@ function App() {
                   dailyPlan.tasks.map((task) => (
                     <div className={`study-session-card ${task.status === 'Complete' ? 'session-complete' : task.timerState === 'running' ? 'session-running' : ''}`} key={task.id} style={{ ...styles.taskItem, flexWrap: 'wrap', gap: '0.75rem', background: task.status === 'Complete' ? 'rgba(16,185,129,0.08)' : 'transparent', borderRadius: '8px' }}>
                       <div className="session-copy" style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flex: '1 1 260px' }}>
-                        <span className="session-emoji" style={{ fontSize: '1.35rem' }}>{task.status === 'Complete' ? '✅' : '📘'}</span>
+                        <span className="session-tag">{task.status === 'Complete' ? 'Done' : 'Study'}</span>
                         <div><strong className="session-title">{task.title}</strong><p style={styles.taskSubtext}>{task.status === 'Complete' ? 'Nice work — you showed up for your goal!' : 'A focused session is enough. Take it at your pace.'}</p></div>
                       </div>
-                      {task.status === 'Complete' ? <span className="earned-points" style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned 🎉</span> : (
+                      {task.status === 'Complete' ? <span className="earned-points" style={{ ...styles.statusBadge, backgroundColor: '#059669' }}>+{task.points} points earned</span> : (
                         <div className="session-controls" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                           <div className="timer-stack">
                             <div className={`timer-face ${task.timerState === 'paused' ? 'timer-is-paused' : ''}`} style={{ '--timer-progress': `${getTimerProgress(task)}%` }}>
@@ -470,11 +470,11 @@ function App() {
                             </div>
                           </div>
                           {task.timerState === 'running' ? (
-                            <button className="timer-action timer-pause" type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Ⅱ Pause</button>
+                            <button className="timer-action timer-pause" type="button" onClick={() => updateStudyTimer(task, 'pause')} style={styles.actionSelect}>Pause</button>
                           ) : task.timerState === 'paused' ? (
-                            <button className="timer-action timer-resume" type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>▶ Resume</button>
+                            <button className="timer-action timer-resume" type="button" onClick={() => updateStudyTimer(task, 'resume')} style={styles.button}>Resume</button>
                           ) : (
-                            <button className="timer-action timer-start" type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>▶ Start session</button>
+                            <button className="timer-action timer-start" type="button" onClick={() => updateStudyTimer(task, 'start')} style={styles.button}>Start session</button>
                           )}
                         </div>
                       )}
@@ -502,9 +502,8 @@ function App() {
               <div className="section-heading"><div><span className="section-kicker">WITH YOUR FRIENDS</span><h3>Shared tasks</h3></div><span className="section-count">{teamTasks.length}</span></div>
               {teamTasks.length === 0 ? <p className="focus-empty">No shared tasks yet. Use <strong>Add task → Shared</strong> to invite a friend.</p> : <div className="shared-task-list">
                 {teamTasks.map((task) => <article className={`shared-task-card task-${task.status.toLowerCase()}`} key={task.id}>
-                  <div className="shared-task-icon">{task.status === 'Complete' ? '🏆' : task.status === 'Dropped' ? '🌱' : '📚'}</div>
-                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>👥 {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> 📅 {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
-                  <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? '✓ Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
+                  <div className="shared-task-copy"><span className="shared-task-status">{task.status === 'Complete' ? 'WIN CELEBRATED' : task.status === 'Dropped' ? 'SAVED FOR LATER' : 'IN PROGRESS'}</span><h4>{task.title}</h4><p>With {task.memberNames ? task.memberNames.join(' & ') : 'Study team'} <span>·</span> Due {task.dueDate === 'Upcoming' ? 'No date set' : task.dueDate}</p></div>
+                  <div className="shared-task-actions"><span className={`task-status-pill status-${task.status.toLowerCase()}`}>{task.status === 'Complete' ? 'Done' : task.status === 'Dropped' ? 'Paused' : 'On track'}</span><select aria-label={`Update ${task.title} status`} value={task.status} onChange={(e) => updateTeamTaskStatus(task.id, e.target.value)}>
                     <option value="Ongoing">In progress</option><option value="Complete">Complete</option><option value="Dropped">Save for later</option>
                   </select></div>
                 </article>)}
@@ -514,20 +513,20 @@ function App() {
         )}
 
         {activeTab === 'posts' && <section className="community-page">
-          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Your study circle ✨</h2><p>Share a win, ask for advice, and cheer each other on.</p></div><span className="community-hero-art" aria-hidden="true">🌈</span></div>
+          <div className="community-hero"><div><span className="hero-eyebrow">THE GYANAEGIS COMMUNITY</span><h2>Your study circle</h2><p>Share a win, ask for advice, and cheer each other on.</p></div></div>
           <form className="post-composer study-panel" onSubmit={publishPost}>
             <div className="post-author-line"><ProfileAvatar name={currentUser.displayName || currentUser.username} image={currentUser.avatarData} className="post-avatar post-avatar-you" onClick={() => openProfile(currentUser.username)} /><div><strong>{currentUser.displayName || currentUser.username}</strong><small>Share with your community</small></div></div>
             <textarea aria-label="Write a post" placeholder="What’s happening with your studies?" value={postText} onChange={(e) => setPostText(e.target.value.slice(0, 1000))} maxLength={1000} rows={3} />
             {postImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={postImage} alt="Selected post" /><button type="button" className="remove-post-image" onClick={() => setPostImage('')}>Remove photo</button></div>}
-            <div className="post-compose-footer"><label className="post-photo-button">📷 Add photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setPostImage); event.target.value = ''; }} /></label><span className="post-visibility">🌍 Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={(!postText.trim() && !postImage) || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'} <span>➤</span></button></div></div>
+            <div className="post-compose-footer"><label className="post-photo-button">Add photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setPostImage); event.target.value = ''; }} /></label><span className="post-visibility">Visible to the community</span><div>{postError && <span className="post-error" role="alert">{postError}</span>}<span className="post-character-count">{postText.length}/1000</span><button className="colorful-button post-submit" type="submit" style={styles.button} disabled={(!postText.trim() && !postImage) || postSubmitting}>{postSubmitting ? 'Posting…' : 'Post'}</button></div></div>
           </form>
           <div className="community-feed-heading"><div><span className="section-kicker">YOUR TIMELINE</span><h3>Latest posts</h3></div><span className="post-feed-count">{posts.length} {posts.length === 1 ? 'post' : 'posts'}</span></div>
           <div className="community-feed" aria-live="polite">
             {postError && <p className="post-error feed-action-error" role="alert">{postError}</p>}
-            {postsLoading && posts.length === 0 ? <div className="feed-empty"><span>⏳</span><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><span>⚠️</span><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><span>🌱</span><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
+            {postsLoading && posts.length === 0 ? <div className="feed-empty"><p>Loading community posts…</p></div> : postsLoadError && posts.length === 0 ? <div className="feed-empty"><p>{postsLoadError}</p></div> : posts.length === 0 ? <div className="feed-empty"><h4>Be the first to post</h4><p>Share a little encouragement or a study win to get the conversation started.</p></div> : posts.map((post, index) => <article className="community-post" key={post.id}>
               <ProfileAvatar name={post.author} image={post.avatarData} className={`post-avatar post-avatar-${index % 4}`} onClick={() => openProfile(post.authorUsername || post.author)} />
-              <div className="community-post-body"><header><div><button type="button" className="post-author-link" onClick={() => openProfile(post.authorUsername || post.author)}>{post.author}</button><button type="button" className="post-handle-link" onClick={() => openProfile(post.authorUsername || post.author)}>@{post.authorUsername || post.author}</button><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.authorUsername?.toLowerCase() === currentUser.username.toLowerCase() ? <div className="post-owner-actions"><button type="button" onClick={() => editingPostId === post.id ? setEditingPostId('') : beginPostEdit(post)}>{editingPostId === post.id ? 'Cancel' : 'Edit'}</button><button type="button" className="post-delete-button" onClick={() => deletePost(post.id)}>Delete</button></div> : <span className="post-public-badge">✦ Community</span>}</header>
-                {editingPostId === post.id ? <div className="post-inline-editor"><textarea aria-label="Edit post" value={editingPostText} onChange={(event) => setEditingPostText(event.target.value.slice(0, 1000))} maxLength={1000} rows={4} />{editingPostImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={editingPostImage} alt="Post attachment" /><button type="button" className="remove-post-image" onClick={() => setEditingPostImage('')}>Remove photo</button></div>}<div className="post-inline-actions"><label className="post-photo-button">📷 Change photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setEditingPostImage); event.target.value = ''; }} /></label><button className="colorful-button" type="button" disabled={postSavingId === post.id || (!editingPostText.trim() && !editingPostImage)} onClick={() => savePostEdit(post.id)}>{postSavingId === post.id ? 'Saving…' : 'Save changes'}</button></div></div> : <><p>{post.text}</p>{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}{post.editedAt && <span className="post-edited-label">Edited</span>}</>}
+              <div className="community-post-body"><header><div><button type="button" className="post-author-link" onClick={() => openProfile(post.authorUsername || post.author)}>{post.author}</button><button type="button" className="post-handle-link" onClick={() => openProfile(post.authorUsername || post.author)}>@{post.authorUsername || post.author}</button><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.authorUsername?.toLowerCase() === currentUser.username.toLowerCase() ? <div className="post-owner-actions"><button type="button" onClick={() => editingPostId === post.id ? setEditingPostId('') : beginPostEdit(post)}>{editingPostId === post.id ? 'Cancel' : 'Edit'}</button><button type="button" className="post-delete-button" onClick={() => deletePost(post.id)}>Delete</button></div> : <span className="post-public-badge">Community</span>}</header>
+                {editingPostId === post.id ? <div className="post-inline-editor"><textarea aria-label="Edit post" value={editingPostText} onChange={(event) => setEditingPostText(event.target.value.slice(0, 1000))} maxLength={1000} rows={4} />{editingPostImage && <div className="post-image-preview-wrap"><img className="post-image-preview" src={editingPostImage} alt="Post attachment" /><button type="button" className="remove-post-image" onClick={() => setEditingPostImage('')}>Remove photo</button></div>}<div className="post-inline-actions"><label className="post-photo-button">Change photo<input type="file" accept="image/*" onChange={(event) => { choosePostPhoto(event.target.files?.[0], setEditingPostImage); event.target.value = ''; }} /></label><button className="colorful-button" type="button" disabled={postSavingId === post.id || (!editingPostText.trim() && !editingPostImage)} onClick={() => savePostEdit(post.id)}>{postSavingId === post.id ? 'Saving…' : 'Save changes'}</button></div></div> : <><p>{post.text}</p>{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}{post.editedAt && <span className="post-edited-label">Edited</span>}</>}
               </div>
             </article>)}
           </div>
@@ -535,22 +534,21 @@ function App() {
 
         {activeTab === 'profile' && <section className="profile-page">
           <button className="profile-back" type="button" onClick={() => setActiveTab(profileReturnTab)}>← Back to {profileReturnTab === 'friends' ? 'friends' : 'posts'}</button>
-          {profileLoading ? <div className="feed-empty"><span>⏳</span><p>Loading profile…</p></div> : profileError && !profileData ? <div className="feed-empty"><span>⚠️</span><p>{profileError}</p></div> : profileData && <>
-            <section className="profile-card study-panel"><div className="profile-cover" /><div className="profile-card-content"><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="profile-page-avatar" /><div className="profile-card-actions">{profileData.username === currentUser.username.toLowerCase() && <button type="button" className="profile-edit-button" onClick={startProfileEdit}>Edit profile</button>}</div><h2>{profileData.displayName}</h2><p className="profile-handle">@{profileData.username}</p>{profileData.bio && <p className="profile-bio">{profileData.bio}</p>}<p className="profile-joined">🎓 Studying with Gyanaegis since {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'recently'}</p><span className="profile-post-count"><strong>{profileData.postCount}</strong> {profileData.postCount === 1 ? 'post' : 'posts'}</span></div></section>
+          {profileLoading ? <div className="feed-empty"><p>Loading profile…</p></div> : profileError && !profileData ? <div className="feed-empty"><p>{profileError}</p></div> : profileData && <>
+            <section className="profile-card study-panel"><div className="profile-cover" /><div className="profile-card-content"><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="profile-page-avatar" /><div className="profile-card-actions">{profileData.username === currentUser.username.toLowerCase() && <button type="button" className="profile-edit-button" onClick={startProfileEdit}>Edit profile</button>}</div><h2>{profileData.displayName}</h2><p className="profile-handle">@{profileData.username}</p>{profileData.bio && <p className="profile-bio">{profileData.bio}</p>}<p className="profile-joined">Studying with Gyanaegis since {profileData.createdAt ? new Date(profileData.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : 'recently'}</p><span className="profile-post-count"><strong>{profileData.postCount}</strong> {profileData.postCount === 1 ? 'post' : 'posts'}</span></div></section>
             <div className="profile-post-heading"><span className="section-kicker">THEIR TIMELINE</span><h3>Posts</h3></div>
-            <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.editedAt && <span className="post-edited-label">Edited</span>}</header>{post.text && <p>{post.text}</p>}{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}</div></article>) : <div className="feed-empty"><span>🌱</span><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
+            <div className="community-feed">{profileData.posts.length ? profileData.posts.map((post) => <article className="community-post" key={post.id}><ProfileAvatar name={profileData.displayName} image={profileData.avatarData} className="post-avatar" /><div className="community-post-body"><header><div><strong>{profileData.displayName}</strong><span className="post-handle-link-static">@{profileData.username}</span><time dateTime={post.createdAt}>{new Date(post.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}</time></div>{post.editedAt && <span className="post-edited-label">Edited</span>}</header>{post.text && <p>{post.text}</p>}{post.imageData && <img className="post-attachment" src={post.imageData} alt="Photo attached to post" />}</div></article>) : <div className="feed-empty"><h4>No posts yet</h4><p>When they share something with the community, it will show up here.</p></div>}</div>
           </>}
         </section>}
 
         {activeTab === 'friends' && (
           <div className="social-page">
             <div className="social-hero">
-              <div><span className="hero-eyebrow">YOUR PEOPLE, YOUR PROGRESS</span><h2>Study feels better together 💬</h2><p>Catch up with friends, share a little encouragement, and keep each other moving.</p></div>
-              <div className="social-hero-art" aria-hidden="true">💌</div>
+              <div><span className="hero-eyebrow">YOUR PEOPLE, YOUR PROGRESS</span><h2>Study feels better together</h2><p>Catch up with friends, share a little encouragement, and keep each other moving.</p></div>
             </div>
             <div className="social-layout">
               <aside className="friend-sidebar study-panel">
-                <div className="section-heading"><div><span className="section-kicker">YOUR CIRCLE</span><h3>Friends <span className="count-bubble">{acceptedFriends.length}</span></h3></div><span className="heading-sticker">🫶</span></div>
+                <div className="section-heading"><div><span className="section-kicker">YOUR CIRCLE</span><h3>Friends <span className="count-bubble">{acceptedFriends.length}</span></h3></div></div>
                 <form className="friend-add-form" onSubmit={sendFriendRequest}>
                   <label htmlFor="friend-username">Add a study buddy</label>
                   <div className="friend-add-row"><input id="friend-username" type="text" placeholder="Friend’s username" style={styles.input} value={friendUsernameInput} onChange={(e) => setFriendUsernameInput(e.target.value)} required /><button className="colorful-button" type="submit" style={styles.button} aria-label="Send friend request">+</button></div>
@@ -563,15 +561,14 @@ function App() {
                   {pendingRequests.map((req) => <div className="request-card" key={req.id}><span className="friend-avatar avatar-coral">{req.senderUsername.slice(0, 1).toUpperCase()}</span><div className="request-copy"><strong>{req.senderUsername}</strong><small>wants to connect</small></div><button type="button" className="accept-button" disabled={acceptingRequestId === req.id} onClick={() => acceptFriendRequest(req.id)}>{acceptingRequestId === req.id ? 'Accepting…' : 'Accept'}</button></div>)}
                 </div>}
 
-                <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? '✦ Ready to chat' : ''}</span></div>
+                <div className="friend-list-heading"><span className="sidebar-label">YOUR FRIENDS</span><span className="online-note">{acceptedFriends.length ? 'Ready to chat' : ''}</span></div>
                 <div className="friend-list">
-                  {acceptedFriends.length === 0 ? <div className="sidebar-empty"><span>🌱</span><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <div
+                  {acceptedFriends.length === 0 ? <div className="sidebar-empty"><p>Your circle starts here.<br />Add a friend by username.</p></div> : acceptedFriends.map((friend, index) => <div
                     className={`friend-row ${selectedFriend?.friendId === friend.friendId ? 'friend-selected' : ''}`}
                     key={friend.id}
                   >
                     <ProfileAvatar name={friend.friendUsername} className={`friend-avatar avatar-${index % 4}`} onClick={() => openProfile(friend.friendUsername)} />
                     <button type="button" className="friend-row-main" onClick={() => { setSelectedFriend(friend); fetchMessages(friend.friendId); }}><span className="friend-row-copy"><strong>{friend.friendUsername}</strong><small>{selectedFriend?.friendId === friend.friendId ? 'Chat is open' : 'Study buddy'}</small></span>
-                    <span className="friend-row-arrow">›</span>
                     </button>
                   </div>)}
                 </div>
@@ -582,10 +579,10 @@ function App() {
                   <div className="chat-header">
                     <ProfileAvatar name={selectedFriend.friendUsername} className="friend-avatar avatar-chat" onClick={() => openProfile(selectedFriend.friendUsername)} />
                     <div className="chat-header-copy"><span className="section-kicker">YOUR STUDY BUDDY</span><h3>{selectedFriend.friendUsername}</h3></div>
-                    <span className="chat-connected">✦ Connected</span>
+                    <span className="chat-connected">Connected</span>
                   </div>
                   <div className="chat-thread" aria-live="polite" ref={chatThreadRef}>
-                    {messages.length === 0 ? <div className="chat-empty"><span>👋</span><h4>Say hello to {selectedFriend.friendUsername}</h4><p>A little encouragement can make someone’s day.</p></div> : messages.map((message) => {
+                    {messages.length === 0 ? <div className="chat-empty"><h4>Say hello to {selectedFriend.friendUsername}</h4><p>A little encouragement can make someone’s day.</p></div> : messages.map((message) => {
                       const mine = message.senderId === currentUser.id;
                       const time = new Date(message.timestamp);
                       return <div className={`message-row ${mine ? 'message-row-mine' : ''}`} key={message._id || message.id}>
@@ -596,9 +593,9 @@ function App() {
                   </div>
                   <form className="chat-compose" onSubmit={sendMessage}>
                     <input type="text" aria-label="Message" placeholder={`Write a kind note to ${selectedFriend.friendUsername}…`} style={styles.input} value={newMessageText} onChange={(e) => setNewMessageText(e.target.value)} required />
-                    <button className="chat-send-button" type="submit" aria-label="Send message">Send <span>➤</span></button>
+                    <button className="chat-send-button" type="submit" aria-label="Send message">Send</button>
                   </form>
-                </> : <div className="chat-placeholder"><div className="chat-placeholder-art">💬</div><span className="section-kicker">A LITTLE CONNECTION GOES A LONG WAY</span><h3>Choose a friend to start chatting</h3><p>Your conversations with study buddies will show up here.</p></div>}
+                </> : <div className="chat-placeholder"><span className="section-kicker">A LITTLE CONNECTION GOES A LONG WAY</span><h3>Choose a friend to start chatting</h3><p>Your conversations with study buddies will show up here.</p></div>}
               </section>
             </div>
           </div>
